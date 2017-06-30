@@ -1369,7 +1369,7 @@ class DefaultManagerServiceTests(base.TestCase):
         )
 
         self.mock_storage.services_controller.\
-            update_cert_info.assert_called_once_with(
+            update_certificate.assert_called_once_with(
                 "domain.com",
                 "san",
                 "flavor_id",
@@ -1445,7 +1445,7 @@ class DefaultManagerServiceTests(base.TestCase):
         )
 
         self.mock_storage.services_controller.\
-            update_cert_info.assert_called_once_with(
+            update_certificate.assert_called_once_with(
                 "new-domain.com",
                 "san",
                 "flavor_id",
@@ -1520,7 +1520,7 @@ class DefaultManagerServiceTests(base.TestCase):
         )
 
         self.mock_storage.services_controller.\
-            update_cert_info.assert_called_once_with(
+            update_certificate.assert_called_once_with(
                 "domain.com",
                 "san",
                 "flavor_id",
@@ -1583,7 +1583,7 @@ class DefaultManagerServiceTests(base.TestCase):
         )
 
         self.assertFalse(
-            self.mock_storage.services_controller.update_cert_info.called
+            self.mock_storage.services_controller.update_certificate.called
         )
 
         (
@@ -1617,7 +1617,7 @@ class DefaultManagerServiceTests(base.TestCase):
             )
 
         self.assertFalse(
-            self.mock_storage.services_controller.update_cert_info.called
+            self.mock_storage.services_controller.update_certificate.called
         )
 
         self.assertFalse(
