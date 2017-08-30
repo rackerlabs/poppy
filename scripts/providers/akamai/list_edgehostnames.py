@@ -57,7 +57,7 @@ def akamai_request(env, config):
 
     # get the latest version number
     version_url = (
-        '{0}papi/v0/properties/prp_{1}/versions/' +
+        '{0}papi/v1/properties/prp_{1}/versions/' +
         '?contractId=ctr_{2}&groupId=grp_{3}')
     version_url = version_url.format(
         base_url,
@@ -82,7 +82,7 @@ def akamai_request(env, config):
 
     # get the hostname information
     policy_url = (
-        '{0}papi/v0/properties/prp_{1}/versions/{4}/hostnames/' +
+        '{0}papi/v1/properties/prp_{1}/versions/{4}/hostnames/' +
         '?contractId=ctr_{2}&groupId=grp_{3}')
     policy_url = policy_url.format(
         base_url,

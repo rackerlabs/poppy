@@ -186,7 +186,7 @@ class CDNProvider(base.Driver):
 
         self.akamai_papi_api_base_url = ''.join([
             str(self.akamai_conf.policy_api_base_url),
-            'papi/v0/{middle_part}/'
+            'papi/v1/{middle_part}/'
             '?contractId=ctr_%s&groupId=grp_%s' % (
                 self.akamai_conf.contract_id,
                 self.akamai_conf.group_id)

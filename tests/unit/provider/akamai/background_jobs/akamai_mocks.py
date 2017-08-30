@@ -75,7 +75,7 @@ class MockManager(mock.Mock):
             'v1/sps-requests/{spsId}?'
             'contractId=None&groupId=None')
         akamai_mock_provider_obj.akamai_papi_api_base_url = (
-            'https://mybaseurl.net/papi/v0/{middle_part}/'
+            'https://mybaseurl.net/papi/v1/{middle_part}/'
             '?contractId=ctr_None&groupId=grp_None')
         akamai_mock_provider_obj.san_mapping_queue.\
             traverse_queue.return_value = []
@@ -241,7 +241,7 @@ class MockPapiAPIClient(mock.Mock):
         if 'activations' in url:
             self.response_200.status_code = 201
             self.response_200.text = json.dumps({
-                "activationLink": "/papi/v0/properties/prp_227429/"
+                "activationLink": "/papi/v1/properties/prp_227429/"
                                   "activations/atv_2511473?contractId"
                                   "=ctr_C-2M6JYA&groupId=grp_12345",
                 'warnings': []
