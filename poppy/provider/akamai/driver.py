@@ -136,6 +136,8 @@ AKAMAI_OPTIONS = [
 
     cfg.ListOpt('sni_cert_cnames',
                 help='A list of sni certs cname host names'),
+    cfg.ListOpt('sni_cert_enrollment_ids',
+                help='Optional list of enrollmentIds. One for each item in "sni_cert_cname"'),
     # SANCERT related configs
     cfg.ListOpt('san_cert_cnames',
                 help='A list of san certs cname host names'),

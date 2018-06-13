@@ -19,7 +19,6 @@ from six.moves import input
 from poppy.provider.akamai.cert_info_storage import cassandra_storage
 from poppy.provider.akamai import driver
 
-
 CONF = cfg.CONF
 CONF.register_cli_opts(cassandra_storage.CASSANDRA_OPTIONS,
                        group=cassandra_storage.AKAMAI_CASSANDRA_STORAGE_GROUP)
@@ -35,31 +34,44 @@ def main():
     }
 
     sni_info_dict = dict()
+    cnames = CONF[driver.AKAMAI_GROUP].sni_cert_cnames
+    enrollment_ids = CONF[driver.AKAMAI_GROUP].sni_cert_enrollment_ids
 
-    for sni_cert_name in CONF[driver.AKAMAI_GROUP].sni_cert_cnames:
-        sni_info_dict[sni_cert_name] = {}
-        print("Insert SNI info for: {0}".format(sni_cert_name))
-        for attr in sni_attribute_default_list:
-            user_input = None
-            while ((user_input or "").strip() or user_input) in ["", None]:
-                user_input = input(
-                    'Please input value for attr: {0}, SNI cert: {1}, '
-                    'default value: {2} (if default is None, '
-                    'that means a real value has to be input): '.format(
-                        attr,
-                        sni_cert_name,
-                        sni_attribute_default_list[attr]
+    if enrollment_ids and len(cnames) == len(enrollment_ids):
+        print("Found valid 'sni_cert_enrollment_ids' setting in poppy.conf")
+        print("{:-^50}\n".format(" Starting upsert "))
+
+        for cname, eid in zip(cnames, enrollment_ids):
+            sni_info_dict[cname] = {}
+            sni_info_dict[cname]["enrollmentId"] = eid
+
+            print("{} -> {}".format(cname, eid))
+        print("\n{:-^50}".format(" Finished "))
+    else:
+        for sni_cert_name in cnames:
+            sni_info_dict[sni_cert_name] = {}
+            print("Insert SNI info for: {0}".format(sni_cert_name))
+            for attr in sni_attribute_default_list:
+                user_input = None
+                while ((user_input or "").strip() or user_input) in ["", None]:
+                    user_input = input(
+                        'Please input value for attr: {0}, SNI cert: {1}, '
+                        'default value: {2} (if default is None, '
+                        'that means a real value has to be input): '.format(
+                            attr,
+                            sni_cert_name,
+                            sni_attribute_default_list[attr]
+                        )
                     )
-                )
-                # enrollmentId is required
-                if user_input in ["", None] and attr == "enrollmentId":
-                    break
-                if sni_attribute_default_list[attr] is None:
-                    continue
-                else:
-                    user_input = sni_attribute_default_list[attr]
-                    break
-            sni_info_dict[sni_cert_name][attr] = user_input
+                    # enrollmentId is required
+                    if user_input in ["", None] and attr == "enrollmentId":
+                        break
+                    if sni_attribute_default_list[attr] is None:
+                        continue
+                    else:
+                        user_input = sni_attribute_default_list[attr]
+                        break
+                sni_info_dict[sni_cert_name][attr] = user_input
 
     v_cassandra_storage.update_san_info(sni_info_dict, info_type='sni')
 
