@@ -272,6 +272,7 @@ COUNTRY_CODE_MAPPING = {
     'San Marino': 'SM',
     'Saudi Arabia': 'SA',
     'Senegal  Seychelles': 'SC',
+    'Serbia': 'RS',
     'Sierra Leone': 'SL',
     'Slovakia': 'SK',
     'Slovenia': 'SI',
