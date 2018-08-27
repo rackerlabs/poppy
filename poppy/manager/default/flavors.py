@@ -24,28 +24,35 @@ class DefaultFlavorsController(base.FlavorsController):
         super(DefaultFlavorsController, self).__init__(manager)
 
     def list(self):
-        """list.
+        """Get list of the supported flavors.
 
-        :return list
+        :return: List of the supported flavors
+        :rtype: list
         """
         return self.storage.list()
 
     def get(self, flavor_id):
-        """get.
+        """Return flavor details.
 
-        ":param flavor_id
-        :return flavor id
+        :param unicode flavor_id: The flavor id
+
+        :return: Flavor details
+        :rtype: poppy.model.flavor.Flavor
         """
         return self.storage.get(flavor_id)
 
     def add(self, new_flavor):
-        """add.
+        """Add a new flavor.
 
-        :param new_flavor
-        :return new flavor
-        :raise LookupError
+        :param new_flavor: The new flavor details
+        :type new_flavor: poppy.model.flavor.Flavor
+
+        :return: The newly added flavor details with
+          provider details
+        :rtype: poppy.model.flavor.Flavor
+
+        :raises ValueError: if the flavor already exists
         """
-        # is this a valid flavor?
         provider_list = self.driver.conf[bootstrap._DRIVER_GROUP].providers
 
         for provider in new_flavor.providers:
@@ -58,9 +65,8 @@ class DefaultFlavorsController(base.FlavorsController):
         return self.storage.add(new_flavor)
 
     def delete(self, flavor_id):
-        """delete.
+        """Delete an existing flavor.
 
-        :param flavor_id
-        :return flavor_id
+        :param unicode flavor_id: The flavor id to delete
         """
         return self.storage.delete(flavor_id)

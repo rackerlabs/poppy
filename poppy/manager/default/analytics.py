@@ -23,6 +23,30 @@ LOG = log.getLogger(__name__)
 class AnalyticsController(base.AnalyticsController):
 
     def get_metrics_by_domain(self, project_id, domain_name, **extras):
+        """Gets metrics information for a domain.
+
+        The below keys are expected in ``extras`` along with their values.
+         - metricType
+         - startTime
+         - endTime
+         - metrics_controller
+
+        Example return:
+            ``{'provider': '', 'flavor':'', 'domain':'', 'metricType': {}}``
+
+        :param unicode project_id: The project id
+        :param unicode domain_name: The domain name
+        :param dict extras: Additional arguments to supply
+
+        :return: A dictionary containing domain name and its metrics
+        :rtype: dict
+
+        :raises ServiceNotFound: if domain not present under project id
+        :raises ServiceProviderDetailsNotFound: if no provider details
+          exists for the service id and project id combo
+        :raises ProviderDetailsIncomplete: if provider is not found
+          for the domain
+        """
 
         storage_controller = self.storage_controller
         try:
