@@ -143,7 +143,7 @@ class SSLCertificate(common.DictSerializableModel):
         flavor_id = input_dict.get('flavor_id', None)
         domain_name = input_dict.get('domain_name', None)
         cert_type = input_dict.get('cert_type', None)
-        cert_details = input_dict.get('cert_details', {})
+        cert_details = dict(input_dict.get('cert_details', {}))
         project_id = input_dict.get('project_id', None)
 
         ssl_cert = cls(flavor_id=flavor_id,

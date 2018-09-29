@@ -17,6 +17,8 @@ import uuid
 
 import ddt
 import mock
+from mock import ANY
+from nose.tools import raises
 from oslo_config import cfg
 
 from poppy.model import ssl_certificate
@@ -65,28 +67,29 @@ class CassandraStorageCertificateTests(base.TestCase):
     def test_get_certs_by_domain(self, cert_details_json):
         # mock the response from cassandra
         self.mock_session.execute.return_value = cert_details_json[0]
-        actual_response = self.cc.get_certs_by_domain(
-            domain_name="www.mydomain.com"
-        )
-        self.assertEqual(len(actual_response), 2)
-        self.assertTrue(all([isinstance(ssl_cert,
-                                        ssl_certificate.SSLCertificate)
-                             for ssl_cert in actual_response]))
-        self.mock_session.execute.return_value = cert_details_json[1]
-        actual_response = self.cc.get_certs_by_domain(
-            domain_name="www.example.com",
-            flavor_id="flavor1")
-        self.assertEqual(len(actual_response), 2)
-        self.assertTrue(all([isinstance(ssl_cert,
-                                        ssl_certificate.SSLCertificate)
-                             for ssl_cert in actual_response]))
-        self.mock_session.execute.return_value = cert_details_json[2]
-        actual_response = self.cc.get_certs_by_domain(
-            domain_name="www.mydomain.com",
-            flavor_id="flavor1",
-            cert_type="san")
-        self.assertTrue(isinstance(actual_response,
-                                   ssl_certificate.SSLCertificate))
+        args = {'domain_name': 'www.mydomain.com',
+                'flavor_id': 'flavor1',
+                'cert_type': 'san' }
+
+        ssl_cert = self.cc.get_certs_by_domain(domain_name = args['domain_name'],
+                                               flavor_id = args['flavor_id'],
+                                               cert_type = args['cert_type'])
+        self.assertTrue(isinstance(ssl_cert, ssl_certificate.SSLCertificate))
+        self.mock_session.execute.assert_called_with(ANY, args)
+
+    @raises(ValueError)
+    def test_get_certs_by_domain_not_exists(self):
+        """Test for a domain that does not have certificate.
+
+        Call the ``get_certs_by_domain()``
+        with a random domain name for which there is no
+        certificate created yet.
+
+        Should receive an Exception.
+        """
+        self.cc.get_certs_by_domain(
+                             domain_name="www.randomdomain.com")
+
 
     def test_get_certs_by_status(self):
         # mock the response from cassandra

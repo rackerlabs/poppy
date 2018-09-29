@@ -16,6 +16,7 @@
 import json
 
 from cassandra import query
+from cassandra.query import dict_factory
 from oslo_log import log
 from six.moves import filterfalse
 
@@ -219,98 +220,87 @@ class CertificatesController(base.CertificatesController):
     def get_certs_by_domain(self, domain_name, project_id=None,
                             flavor_id=None,
                             cert_type=None):
+        """Get certificate details associated with the given domain name.
 
+        The cassandra table ``certificate_info`` stores the certificates
+        details for domain names. The field ``domain_name`` is a unique
+        key in that table hence it is always guaranteed that for any
+        given domain name there is one and only one matching certificate.
+
+        List of valid ``cert_type``:
+            - san
+            - sni
+            - custom
+            - dedicated
+
+        :param unicode domain_name: The name of the domain
+        :param unicode project_id: The project id
+        :param unicode flavor_id: The flavor id
+        :param unicode cert_type: Type of the certificate
+
+        :return: Matching SSLCertificate object for the domain
+        :rtype: poppy.model.ssl_certificate.SSLCertificate
+
+        :raises ValueError: If no matching certificate found
+        """
         LOG.info("Check if cert on '{0}' exists".format(domain_name))
         args = {
-            'domain_name': domain_name.lower()
+            'domain_name': domain_name.lower(),
         }
-        stmt = query.SimpleStatement(
-            CQL_SEARCH_CERT_BY_DOMAIN,
+
+        query_string  = CQL_SEARCH_CERT_BY_DOMAIN
+
+        if project_id is not None:
+            query_string += "\nAND project_id = %(project_id)s "
+            args['project_id'] = project_id
+
+        if flavor_id is not None:
+            query_string += "\nAND flavor_id = %(flavor_id)s "
+            args['flavor_id'] = flavor_id
+
+        if cert_type is not None:
+            query_string += "\nAND cert_type = %(cert_type)s "
+            args['cert_type'] = cert_type
+
+        stmt = query.SimpleStatement(query_string,
             consistency_level=self._driver.consistency_level)
-        resultset = self.session.execute(stmt, args)
-        complete_results = list(resultset)
-        certs = []
-        if complete_results:
-            for r in complete_results:
-                r_project_id = str(r.get('project_id'))
-                r_flavor_id = str(r.get('flavor_id'))
-                r_cert_type = str(r.get('cert_type'))
-                r_cert_details = {}
-                # in case cert_details is None
-                cert_details = r.get('cert_details', {}) or {}
-                # Need to convert cassandra dict into real dict
-                # And the value of cert_details is a string dict
-                for key in cert_details:
-                    r_cert_details[key] = json.loads(cert_details[key])
-                LOG.info(
-                    "Certificate for domain: {0}  with flavor_id: {1}, "
-                    "cert_details : {2} and  cert_type: {3} present "
-                    "on project_id: {4}".format(
-                        domain_name,
-                        r_flavor_id,
-                        r_cert_details,
-                        r_cert_type,
-                        r_project_id
-                    )
-                )
-                ssl_cert = ssl_certificate.SSLCertificate(
-                    domain_name=domain_name,
-                    flavor_id=r_flavor_id,
-                    cert_details=r_cert_details,
-                    cert_type=r_cert_type,
-                    project_id=r_project_id
-                )
+        self.session.row_factory = dict_factory
+        result = self.session.execute(stmt, args)
 
-                certs.append(ssl_cert)
-
-        non_none_attrs_gen = filterfalse(
-            lambda x: list(x.values())[0] is None, [{'project_id': project_id},
-                                                    {'flavor_id': flavor_id},
-                                                    {'cert_type': cert_type}])
-        non_none_attrs_list = list(non_none_attrs_gen)
-        non_none_attrs_dict = {}
-
-        if non_none_attrs_list:
-            for attr in non_none_attrs_list:
-                non_none_attrs_dict.update(attr)
-
-        def argfilter(certificate):
-            all_conditions = True
-            if non_none_attrs_dict:
-                for k, v in non_none_attrs_dict.items():
-                    if getattr(certificate, k) != v:
-                        all_conditions = False
-
-            return all_conditions
-
-        total_certs = [cert for cert in certs if argfilter(cert)]
-
-        if len(total_certs) == 1:
-            return total_certs[0]
-        else:
-            return total_certs
+        try:
+            return ssl_certificate.SSLCertificate.init_from_dict(result[0])
+        except:
+            raise ValueError("No matching certificates found for "
+                             "the domain {}".format(domain_name))
 
     def cert_already_exist(self, domain_name, comparing_cert_type,
                            comparing_flavor_id, comparing_project_id):
-        """cert_already_exist
+        """Check if a certificate exists for the given domain name.
 
         Check if a cert with this domain name and type has already been
-        created, or if the domain has been taken by other customers
+        created, or if the domain has been taken by other customers.
 
-        :param domain_name
-        :param comparing_cert_type
-        :param comparing_flavor_id
-        :param comparing_project_id
+        List of valid ``cert_type``:
+            - san
+            - sni
+            - custom
+            - dedicated
 
-        :returns Boolean if the cert with same type exists with another user.
+        :param unicode domain_name: The name of the domain
+        :param unicode comparing_cert_type: Type of the certificate
+        :param unicode comparing_flavor_id: Flavor id
+        :param unicode comparing_project_id: Project id
+
+        :returns: ``True`` if there is already a certificate exists
+            for the given domain name. Else ``False``.
+        :rtype: bool
         """
-        cert = self.get_certs_by_domain(
+        try:
+            self.get_certs_by_domain(
             domain_name=domain_name,
             cert_type=comparing_cert_type,
             flavor_id=comparing_flavor_id
         )
-
-        if cert:
             return True
-        else:
+        except ValueError:
             return False
