@@ -243,6 +243,7 @@ class CDNProvider(base.Driver):
         unique_id = str(uuid.uuid4())
         request_headers = {
             'Content-type': 'application/json',
+            'X-Customer-Id': "000",
             'Accept': 'text/plain'
         }
 
