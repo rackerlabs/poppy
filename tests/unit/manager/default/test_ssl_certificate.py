@@ -330,7 +330,7 @@ class DefaultSSLCertificateControllerTests(base.TestCase):
             }), encoding='utf-8')
         ]
         self.scc.storage.get_certs_by_domain. \
-            return_value = []
+            side_effect = ValueError
 
         self.scc.rerun_san_retry_list()
 

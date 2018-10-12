@@ -354,15 +354,15 @@ class DefaultServicesController(base.ServicesController):
 
             # old domains need to bind as well
             elif domain.certificate in ['san', 'sni']:
-                cert_for_domain = (
-                    self.ssl_certificate_storage.get_certs_by_domain(
-                        domain.domain,
-                        project_id=project_id,
-                        flavor_id=service_old.flavor_id,
-                        cert_type=domain.certificate))
-                if cert_for_domain == []:
-                    cert_for_domain = None
-                domain.cert_info = cert_for_domain
+                try:
+                    domain.cert_info = (
+                        self.ssl_certificate_storage.get_certs_by_domain(
+                            domain.domain,
+                            project_id=project_id,
+                            flavor_id=service_old.flavor_id,
+                            cert_type=domain.certificate))
+                except ValueError:
+                    domain.cert_info = None
 
         service_old_json = json.loads(json.dumps(service_old.to_dict()))
 
@@ -416,15 +416,15 @@ class DefaultServicesController(base.ServicesController):
                             service_new.service_id,
                             store)
                 elif domain.certificate in ['san', 'sni']:
-                    cert_for_domain = (
-                        self.ssl_certificate_storage.get_certs_by_domain(
-                            domain.domain,
-                            project_id=project_id,
-                            flavor_id=service_new.flavor_id,
-                            cert_type=domain.certificate))
-                    if cert_for_domain == []:
-                        cert_for_domain = None
-                    domain.cert_info = cert_for_domain
+                    try:
+                        domain.cert_info = (
+                            self.ssl_certificate_storage.get_certs_by_domain(
+                                domain.domain,
+                                project_id=project_id,
+                                flavor_id=service_new.flavor_id,
+                                cert_type=domain.certificate))
+                    except ValueError:
+                        domain.cert_info = None
 
                     # retrofit the access url info into
                     # certificate_info table
@@ -938,13 +938,13 @@ class DefaultServicesController(base.ServicesController):
             # from the query below. Once additional flavors are added, a
             # query for the service object rather than provider details only
             # should provide the flavor id to use in the query below
-            cert_obj = self.ssl_certificate_storage.get_certs_by_domain(
-                domain_name,
-                project_id=project_id,
-                cert_type='san'
-            )
+            try:
+                cert_obj = self.ssl_certificate_storage.get_certs_by_domain(
+                    domain_name,
+                    project_id=project_id,
+                    cert_type='san'
+                )
 
-            if cert_obj != []:
                 # cert was found, update the cert status
                 cert_details = cert_obj.cert_details
                 cert_details[provider]['extra_info']['status'] = cert_status
@@ -956,6 +956,10 @@ class DefaultServicesController(base.ServicesController):
                     cert_obj.flavor_id,
                     cert_details
                 )
+            except ValueError:
+                LOG.info("No matching certificate found for the "
+                         "combination of {0} and {1} and {2} "
+                         "".format(domain_name, project_id, 'san'))
 
             for url in provider_details[provider].access_urls:
                 if url.get('domain') == domain_name:

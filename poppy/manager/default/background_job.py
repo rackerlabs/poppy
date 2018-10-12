@@ -170,14 +170,14 @@ class BackgroundJobController(base.BackgroundJobController):
                             project_id=cert_dict['project_id']
                         )
 
-                        cert_for_domain = self.cert_storage.\
-                            get_certs_by_domain(
-                                cert_obj.domain_name,
-                                project_id=cert_obj.project_id,
-                                flavor_id=cert_obj.flavor_id,
-                                cert_type=cert_obj.cert_type
-                            )
-                        if cert_for_domain == []:
+                        try:
+                            self.cert_storage.get_certs_by_domain(
+                                    cert_obj.domain_name,
+                                    project_id=cert_obj.project_id,
+                                    flavor_id=cert_obj.flavor_id,
+                                    cert_type=cert_obj.cert_type
+                                )
+                        except ValueError:
                             ignore_list.append(cert_dict)
                             LOG.info(
                                 "Ignored property update because "
@@ -334,14 +334,14 @@ class BackgroundJobController(base.BackgroundJobController):
                             project_id=cert_dict['project_id']
                         )
 
-                        cert_for_domain = self.cert_storage.\
-                            get_certs_by_domain(
-                                cert_obj.domain_name,
-                                project_id=cert_obj.project_id,
-                                flavor_id=cert_obj.flavor_id,
-                                cert_type=cert_obj.cert_type
-                            )
-                        if cert_for_domain == []:
+                        try:
+                            self.cert_storage.get_certs_by_domain(
+                                    cert_obj.domain_name,
+                                    project_id=cert_obj.project_id,
+                                    flavor_id=cert_obj.flavor_id,
+                                    cert_type=cert_obj.cert_type
+                                )
+                        except ValueError:
                             ignore_list.append(cert_dict)
                             LOG.info(
                                 "Ignored property update because "
@@ -542,12 +542,13 @@ class BackgroundJobController(base.BackgroundJobController):
             http_policies = util.remove_duplicates(http_policies)
 
             for policy_dict in http_policies:
-                cert_for_domain = self.cert_storage.get_certs_by_domain(
-                    policy_dict['policy_name'],
-                    project_id=policy_dict['project_id'],
-                    cert_type='san'
-                )
-                if cert_for_domain == []:
+                try:
+                    cert_for_domain = self.cert_storage.get_certs_by_domain(
+                        policy_dict['policy_name'],
+                        project_id=policy_dict['project_id'],
+                        cert_type='san'
+                    )
+                except ValueError:
                     ignore_list.append(policy_dict)
                     LOG.info(
                         "No cert found for policy name. "

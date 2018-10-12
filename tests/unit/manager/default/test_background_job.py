@@ -677,7 +677,7 @@ class DefaultSSLCertificateControllerTests(base.TestCase):
 
     def test_delete_http_policy_cert_doesnt_exist(self):
         self.mock_storage.certificates_controller.\
-            get_certs_by_domain.return_value = []
+            get_certs_by_domain.side_effect = ValueError
 
         http_policy_queue = self.manager_driver.providers[
             'akamai'].obj.http_policy_queue

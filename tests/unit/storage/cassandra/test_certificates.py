@@ -65,17 +65,54 @@ class CassandraStorageCertificateTests(base.TestCase):
 
     @ddt.file_data('data_get_certs_by_domain.json')
     def test_get_certs_by_domain(self, cert_details_json):
-        # mock the response from cassandra
-        self.mock_session.execute.return_value = cert_details_json[0]
-        args = {'domain_name': 'www.mydomain.com',
-                'flavor_id': 'flavor1',
-                'cert_type': 'san' }
+        """Test for getting certificate by given domain name.
 
-        ssl_cert = self.cc.get_certs_by_domain(domain_name = args['domain_name'],
-                                               flavor_id = args['flavor_id'],
-                                               cert_type = args['cert_type'])
+        Mock the cassandra response to have below values:
+            - flavor_id as 'flavor1'
+            - cert_type as 'san'
+            - valid 'cert_details' details
+
+        Call the ``get_certs_by_domain`` with the correct values.
+        Expect that the method constructs and returns a correct
+        ``SSLCertificate`` object.
+
+        :param list cert_details_json: List of dicts that holds values
+            to mock the cassandra response
+        """
+        self.mock_session.execute.return_value = cert_details_json[0]
+        ssl_cert = self.cc.get_certs_by_domain( 'www.mydomain.com',
+                                               flavor_id = 'flavor1',
+                                               cert_type = 'san')
         self.assertTrue(isinstance(ssl_cert, ssl_certificate.SSLCertificate))
-        self.mock_session.execute.assert_called_with(ANY, args)
+        self.assertEqual(ssl_cert.flavor_id, 'flavor1')
+        self.assertEqual(ssl_cert.project_id, '12345')
+        self.assertEqual(ssl_cert.cert_type, 'san')
+        self.mock_session.execute.assert_called()
+
+    @raises(ValueError)
+    @ddt.file_data('data_get_certs_by_domain.json')
+    def test_get_certs_by_domain_non_none(self, cert_details_json):
+        """Test for verifying the input parameters.
+
+        Mock the cassandra response to have the below values
+            - flavor_id as 'flavor1'
+            - cert_type as 'san'
+
+        But call the ``get_certs_by_domain`` with different values for
+        flavor_id and cert_type.
+
+        Expect that the returned values from cassandra not matching
+        with the passed parameters; eventually raising an ValueError.
+
+        :param list cert_details_json: List of dicts that holds values
+            to mock the cassandra response
+        """
+        self.mock_session.execute.return_value = cert_details_json[0]
+        self.cc.get_certs_by_domain(
+            domain_name="www.mydomain.com",
+            flavor_id='flavor2',
+            cert_type='sni'
+        )
 
     @raises(ValueError)
     def test_get_certs_by_domain_not_exists(self):

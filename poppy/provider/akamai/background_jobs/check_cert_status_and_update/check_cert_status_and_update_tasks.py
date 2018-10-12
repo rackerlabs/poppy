@@ -36,12 +36,14 @@ class GetCertInfoTask(task.Task):
             memoized_controllers.task_controllers('poppy', 'ssl_certificate')
         self.storage = self.ssl_certificate_manager.storage
 
-        res = self.storage.get_certs_by_domain(
-            domain_name, project_id=project_id,
-            flavor_id=flavor_id, cert_type=cert_type)
-        if res is None:
+        try:
+            res = self.storage.get_certs_by_domain(
+                domain_name, project_id=project_id,
+                flavor_id=flavor_id, cert_type=cert_type)
+            return json.dumps(res.to_dict())
+        except ValueError:
             return ""
-        return json.dumps(res.to_dict())
+
 
 
 class CheckCertStatusTask(task.Task):

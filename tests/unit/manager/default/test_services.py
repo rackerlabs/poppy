@@ -773,7 +773,7 @@ class DefaultManagerServiceTests(base.TestCase):
         service_obj.provider_details = providers_details_dict
         service_obj.status = u'deployed'
         self.sc.storage_controller.get_service.return_value = service_obj
-        self.sc.ssl_certificate_storage.get_certs_by_domain.return_value = []
+        self.sc.ssl_certificate_storage.get_certs_by_domain.side_effect = ValueError
         self.sc.flavor_controller.get.return_value = flavor.Flavor(
             'standard',
             providers=[
@@ -1572,7 +1572,7 @@ class DefaultManagerServiceTests(base.TestCase):
             get_provider_details.return_value = mock_provider_details
 
         self.mock_storage.certificates_controller.\
-            get_certs_by_domain.return_value = []
+            get_certs_by_domain.side_effect = ValueError
 
         self.sc.migrate_domain(
             "project_id",

@@ -248,27 +248,41 @@ class CertificatesController(base.CertificatesController):
             'domain_name': domain_name.lower(),
         }
 
-        query_string  = CQL_SEARCH_CERT_BY_DOMAIN
-
-        if project_id is not None:
-            query_string += "\nAND project_id = %(project_id)s "
-            args['project_id'] = project_id
-
-        if flavor_id is not None:
-            query_string += "\nAND flavor_id = %(flavor_id)s "
-            args['flavor_id'] = flavor_id
-
-        if cert_type is not None:
-            query_string += "\nAND cert_type = %(cert_type)s "
-            args['cert_type'] = cert_type
-
-        stmt = query.SimpleStatement(query_string,
+        stmt = query.SimpleStatement(CQL_SEARCH_CERT_BY_DOMAIN,
             consistency_level=self._driver.consistency_level)
         self.session.row_factory = dict_factory
         result = self.session.execute(stmt, args)
 
         try:
-            return ssl_certificate.SSLCertificate.init_from_dict(result[0])
+            cert_obj = result[0]
+            for k, v in cert_obj.items():
+                if k == "cert_details":
+                    # Cassandra returns OrderedMapSerializedKey for
+                    # cert_details. Converting it to python dict.
+                    cert_details  = {}
+                    for x,y in cert_obj[k].items():
+                        cert_details[x] = json.loads(y)
+                    cert_obj[k] = cert_details
+                else:
+                    cert_obj[k] = str(v)
+
+            ssl_cert = ssl_certificate.SSLCertificate.init_from_dict(cert_obj)
+
+            # Check that all supplied optional parameters
+            # (project_id, flavor_id and cert_type ) with non-none values
+            # are matching with the values returned from database.
+            params = {
+                'project_id': project_id,
+                'flavor_id': flavor_id,
+                'cert_type': cert_type
+            }
+            non_none_args = [(k, v) for k, v in params.items() if v is not None]
+            for name, value in non_none_args:
+                if getattr(ssl_cert, name) != value:
+                    raise ValueError("No matching certificates found for "
+                                     "the domain {}".format(domain_name))
+
+            return ssl_cert
         except:
             raise ValueError("No matching certificates found for "
                              "the domain {}".format(domain_name))
