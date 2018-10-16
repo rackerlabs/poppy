@@ -18,11 +18,9 @@ import json
 from cassandra import query
 from cassandra.query import dict_factory
 from oslo_log import log
-from six.moves import filterfalse
 
 from poppy.model import ssl_certificate
 from poppy.storage import base
-
 
 LOG = log.getLogger(__name__)
 
@@ -65,7 +63,6 @@ CQL_DELETE_CERT_STATUS = '''
     WHERE domain_name = %(domain_name)s
 '''
 
-
 CQL_INSERT_CERT_STATUS = '''
     INSERT INTO cert_status (domain_name,
         status
@@ -83,7 +80,6 @@ CQL_UPDATE_CERT_DETAILS = '''
 
 
 class CertificatesController(base.CertificatesController):
-
     """Certificates Controller."""
 
     @property
@@ -193,14 +189,14 @@ class CertificatesController(base.CertificatesController):
                 "state: {0}: {1}".format(cert_details, e))
 
     def insert_cert_status(self, domain_name, cert_status):
-            cert_args = {
-                'domain_name': domain_name,
-                'status': cert_status
-            }
-            stmt = query.SimpleStatement(
-                CQL_INSERT_CERT_STATUS,
-                consistency_level=self._driver.consistency_level)
-            self.session.execute(stmt, cert_args)
+        cert_args = {
+            'domain_name': domain_name,
+            'status': cert_status
+        }
+        stmt = query.SimpleStatement(
+            CQL_INSERT_CERT_STATUS,
+            consistency_level=self._driver.consistency_level)
+        self.session.execute(stmt, cert_args)
 
     def get_certs_by_status(self, status):
 
@@ -248,7 +244,8 @@ class CertificatesController(base.CertificatesController):
             'domain_name': domain_name.lower(),
         }
 
-        stmt = query.SimpleStatement(CQL_SEARCH_CERT_BY_DOMAIN,
+        stmt = query.SimpleStatement(
+            CQL_SEARCH_CERT_BY_DOMAIN,
             consistency_level=self._driver.consistency_level)
         self.session.row_factory = dict_factory
         result = self.session.execute(stmt, args)
@@ -259,8 +256,8 @@ class CertificatesController(base.CertificatesController):
                 if k == "cert_details":
                     # Cassandra returns OrderedMapSerializedKey for
                     # cert_details. Converting it to python dict.
-                    cert_details  = {}
-                    for x,y in cert_obj[k].items():
+                    cert_details = {}
+                    for x, y in cert_obj[k].items():
                         cert_details[x] = json.loads(y)
                     cert_obj[k] = cert_details
                 else:
@@ -276,7 +273,8 @@ class CertificatesController(base.CertificatesController):
                 'flavor_id': flavor_id,
                 'cert_type': cert_type
             }
-            non_none_args = [(k, v) for k, v in params.items() if v is not None]
+            non_none_args = \
+                [(k, v) for k, v in params.items() if v is not None]
             for name, value in non_none_args:
                 if getattr(ssl_cert, name) != value:
                     raise ValueError("No matching certificates found for "
@@ -311,10 +309,10 @@ class CertificatesController(base.CertificatesController):
         """
         try:
             self.get_certs_by_domain(
-            domain_name=domain_name,
-            cert_type=comparing_cert_type,
-            flavor_id=comparing_flavor_id
-        )
+                domain_name=domain_name,
+                cert_type=comparing_cert_type,
+                flavor_id=comparing_flavor_id
+            )
             return True
         except ValueError:
             return False

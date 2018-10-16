@@ -773,7 +773,8 @@ class DefaultManagerServiceTests(base.TestCase):
         service_obj.provider_details = providers_details_dict
         service_obj.status = u'deployed'
         self.sc.storage_controller.get_service.return_value = service_obj
-        self.sc.ssl_certificate_storage.get_certs_by_domain.side_effect = ValueError
+        self.sc.ssl_certificate_storage.get_certs_by_domain.side_effect \
+            = ValueError
         self.sc.flavor_controller.get.return_value = flavor.Flavor(
             'standard',
             providers=[

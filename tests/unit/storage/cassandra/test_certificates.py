@@ -80,14 +80,17 @@ class CassandraStorageCertificateTests(base.TestCase):
             to mock the cassandra response
         """
         self.mock_session.execute.return_value = cert_details_json[0]
-        ssl_cert = self.cc.get_certs_by_domain( 'www.mydomain.com',
-                                               flavor_id = 'flavor1',
-                                               cert_type = 'san')
+        args = {
+            'domain_name': 'www.mydomain.com',
+        }
+        ssl_cert = self.cc.get_certs_by_domain('www.mydomain.com',
+                                               flavor_id='flavor1',
+                                               cert_type='san')
         self.assertTrue(isinstance(ssl_cert, ssl_certificate.SSLCertificate))
         self.assertEqual(ssl_cert.flavor_id, 'flavor1')
         self.assertEqual(ssl_cert.project_id, '12345')
         self.assertEqual(ssl_cert.cert_type, 'san')
-        self.mock_session.execute.assert_called()
+        self.mock_session.execute.assert_called_with(ANY, args)
 
     @raises(ValueError)
     @ddt.file_data('data_get_certs_by_domain.json')
@@ -126,7 +129,6 @@ class CassandraStorageCertificateTests(base.TestCase):
         """
         self.cc.get_certs_by_domain(
                              domain_name="www.randomdomain.com")
-
 
     def test_get_certs_by_status(self):
         # mock the response from cassandra
