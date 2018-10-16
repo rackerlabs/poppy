@@ -1,15 +1,17 @@
-zookeeper:
+version: '2'
+services:
+  zookeeper:
     image: jplock/zookeeper
     ports:
-     - 2181:2181
+      - 2181:2181
 
-cassandra:
+  cassandra:
     image: library/cassandra
     ports:
-     - 9160:9160
-     - 9042:9042
+      - 9160:9160
+      - 9042:9042
 
-mimic:
+  mimic:
     image: amitgandhinz/mimic
     ports:
-     - 8900:8900
+      - 8900:8900
