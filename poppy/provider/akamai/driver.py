@@ -13,7 +13,46 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Akamai CDN Provider implementation."""
+"""Akamai CDN Provider implementation.
+
+    A concrete implementation of Poppy's base provider for Akamai.
+
+    Initializes authorized clients to communicate with various Akamai end-points.
+    Authorizes clients based on the values found
+    from section ``[drivers:provider:akamai]`` in ``poppy.conf``.
+
+    Initializes ``queue`` objects to store certificates, mappings and
+    http policies. Path values for the queues will be read
+    from section ``[drivers:provider:akamai:queue]`` in ``poppy.conf``
+
+    Provides Akamai's specific implementation for ``is_alive()``
+    that checks for the provider health status.
+
+    Some of the initializations are as below.
+
+     - Clients to communicate with different Akamai APIs
+
+        - Policy API client
+        - CCU API client (Content Control Utility)
+        - SPS API client (Secured Provisioning System)
+        - CPS API client (Certificate Provisioning System)
+        - PAPI client (Property Manager API)
+        - Sub customer API client
+
+     - Queues
+
+        - mod san queue
+        - san mapping queue
+        - http policy queue
+
+     - Configuration numbers
+
+        - Http conf
+        - Https shared conf
+        - Https san conf
+        - Https sni conf
+        - Https custom conf
+"""
 
 import json
 
@@ -134,6 +173,15 @@ VALID_PROPERTY_SPEC = [
 class CDNProvider(base.Driver):
 
     def __init__(self, conf):
+        """Initialize Akamai driver.
+
+        Process the ``poppy.conf`` and initializes base urls
+        for various Akamai end-points; configuration numbers;
+        api clients and zookeeper queues.
+
+        :param conf: Poppy configuration
+        :type conf: oslo_config.ConfigOpts
+        """
         super(CDNProvider, self).__init__(conf)
 
         self._conf.register_opts(AKAMAI_OPTIONS,
@@ -226,6 +274,11 @@ class CDNProvider(base.Driver):
 
     @decorators.lazy_property(write=False)
     def cert_info_storage(self):
+        """Returns driver for certificate storage.
+
+        :return: Driver for certificate storage
+        :rtype: poppy.provider.cert_info_storage.base.BaseAkamaiSanInfoStorage
+        """
         storage_backend_type = 'poppy.provider.akamai.cert_info_storage'
         storage_backend_name = self.akamai_conf.cert_info_storage_type
 
@@ -240,10 +293,18 @@ class CDNProvider(base.Driver):
         return cert_info_storage.driver
 
     def is_alive(self):
+        """Perform Akamai health check.
+
+        Try contacting the Akamai policy API by creating
+        a new dummy policy name. If the response is OK,
+        return True.
+
+        :return: True if provider layer is up and running
+        :rtype: bool
+        """
         unique_id = str(uuid.uuid4())
         request_headers = {
             'Content-type': 'application/json',
-            'X-Customer-Id': "000",
             'Accept': 'text/plain'
         }
 
@@ -276,25 +337,83 @@ class CDNProvider(base.Driver):
 
     @property
     def provider_name(self):
+        """Returns the name of the underlying provider.
+
+        :return: Name of the provider
+        :rtype: str
+        """
         return "Akamai"
 
     @property
     def policy_api_client(self):
+        """Returns client for Akamai Policy API.
+
+        The returned client is already authorized and ready to make
+        requests to Akamai Policy API.
+
+        :return: Authorized Policy API client
+        :rtype: requests.sessions.Session
+        """
         return self.akamai_policy_api_client
 
     @property
     def ccu_api_client(self):
+        """Returns client for Akamai CCU API.
+
+        The returned client is already authorized and ready to make
+        requests to Akamai CCU API.
+
+        :return: Authorized CCU API client
+        :rtype: requests.sessions.Session
+        """
         return self.akamai_ccu_api_client
 
     @property
     def sps_api_client(self):
+        """Returns client for Akamai SPS API.
+
+        The returned client is already authorized and ready to make
+        requests to Akamai SPS API.
+
+        :return: Authorized Policy SPS client
+        :rtype: requests.sessions.Session
+        """
         return self.akamai_sps_api_client
 
     @property
     def papi_api_client(self):
+        """Returns client for Akamai PAPI.
+
+        The returned client is already authorized and ready to make
+        requests to Akamai PAPI .
+
+        :return: Authorized PAPI client
+        :rtype: requests.sessions.Session
+        """
         return self.akamai_papi_api_client
 
     def papi_property_id(self, property_spec):
+        """Returns config_number for the given property spec.
+
+        Valid property_spec:
+         - akamai_http_config_number
+         - akamai_https_shared_config_number
+         - akamai_https_san_config_numbers
+         - akamai_https_sni_config_numbers
+         - akamai_https_custom_config_numbers
+
+         Example return:
+
+         .. code-block:: python
+
+            'prp_226831'
+
+        :param unicode property_spec: The property name
+        :return: Config number for the property
+        :rtype: unicode
+
+        :raises ValueError: If not a valid property spec
+        """
         if property_spec not in VALID_PROPERTY_SPEC:
             raise ValueError('No a valid property spec: %s'
                              ', valid property specs are: %s'
@@ -306,10 +425,18 @@ class CDNProvider(base.Driver):
 
     @property
     def service_controller(self):
-        """Returns the driver's service controller."""
+        """Returns the driver's service controller.
+
+        :return: Service controller
+        :rtype: poppy.provider.services.ServiceController
+        """
         return controllers.ServiceController(self)
 
     @property
     def certificate_controller(self):
-        """Returns the driver's certificate controller."""
+        """Returns the driver's certificate controller.
+
+        :return: Certificate controller
+        :rtype: poppy.provider.certificates.CertificateController
+        """
         return controllers.CertificateController(self)
