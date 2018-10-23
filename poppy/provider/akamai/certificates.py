@@ -127,8 +127,8 @@ class CertificateController(base.CertificateBase):
                     # default san_cert_hostname_limit to the value provided in
                     # the config file.
                     san_cert_hostname_limit = (
-                        san_cert_hostname_limit or
-                        self.driver.san_cert_hostname_limit
+                            san_cert_hostname_limit or
+                            self.driver.san_cert_hostname_limit
                     )
 
                     # Check san_cert to enforce number of hosts hasn't
@@ -187,7 +187,7 @@ class CertificateController(base.CertificateBase):
                             pass
                         elif status != 'SPS Request Complete':
                             LOG.info("SPS Not completed for {0}...".format(
-                                     san_cert_name))
+                                san_cert_name))
                             continue
                     # issue modify san_cert sps request
                     cert_info = self.cert_info_storage.get_cert_info(
@@ -401,8 +401,8 @@ class CertificateController(base.CertificateBase):
                         cert_name))
                     continue
                 cert_hostname_limit = (
-                    cert_hostname_limit or
-                    self.driver.san_cert_hostname_limit
+                        cert_hostname_limit or
+                        self.driver.san_cert_hostname_limit
                 )
 
                 host_names_count = utils.get_ssl_number_of_hosts_alternate(
@@ -564,16 +564,16 @@ class CertificateController(base.CertificateBase):
                     )
                 )
 
-                if found is False:
-                    return self.responder.ssl_certificate_deleted(
-                        cert_obj.domain_name,
-                        {
-                            'status': 'failed',
-                            'reason': (
-                                'Domain does not exist on any certificate '
-                            )
-                        }
-                    )
+                if not found:
+                    # Domain does not exist on any of the certificates.
+                    # This could be because of any of the below reason.
+                    # - Current Domain still under pending change
+                    # - Add Domain request did not reach Akamai yet
+                    # - Domain got Manually deleted (Luna)
+                    # In all the cases, no need to go ahead to delete
+                    # the domain because it does not exists.
+                    # Cancel the pending change and return
+                    return self._cancel_pending_change(cert_obj)
 
                 enrollment_id = (
                     self.cert_info_storage.get_cert_enrollment_id(
@@ -670,8 +670,8 @@ class CertificateController(base.CertificateBase):
                     "Error: {1}".format(cert_obj.domain_name, exc))
                 return self.responder.ssl_certificate_deleted(None, {
                     'status': 'failed',
-                    'reason': "Delete cert type {0} failed due to {1}."
-                    .format(cert_obj.cert_type, exc)
+                    'reason': "Delete cert type {} failed due to {}.".format(
+                            cert_obj.cert_type, exc)
                 })
         else:
             return self.responder.ssl_certificate_provisioned(None, {
@@ -680,3 +680,72 @@ class CertificateController(base.CertificateBase):
                     cert_obj.cert_type
                 )
             })
+
+    def _cancel_pending_change(self, cert_obj):
+        """Cancel pending changes.
+
+        Domains cannot be removed from a certificate while
+        there are pending changes on the enrollment.
+        Those changes needs to be cancelled before
+        deleting the domain from that certificate.
+
+        Make sure that the ``pending changes`` are
+        actually relevant to the given SSL certificate
+        by checking for the filed ``change_url``. If it
+        is present, try making an Akamai call to cancel
+        the CPS change.
+
+        Note that irrespective of the outcome of the Akamai
+        call, the whole ``delete domain operation`` should
+        skip for a later attempt (through retry logic) as the
+        enrollment had an active change in progress at
+        this point of time.
+
+        :param cert_obj: The SSL certificate object
+        :type cert_obj: poppy.model.ssl_certificate.SSLCertificate
+
+        :return: A responder message with status of the operation
+        :rtype: dict
+        """
+        try:
+            change_url = (
+                cert_obj.cert_details["Akamai"]
+                ["extra_info"]["change_url"]
+            )
+        except KeyError:
+            status = "Maybe the domain {} already removed? " \
+                     "Delete domain operation failed"\
+                .format(cert_obj.domain_name)
+            LOG.info(status)
+
+            return self.responder.ssl_certificate_deleted(
+                cert_obj.domain_name,
+                {
+                    'status': status,
+                }
+            )
+
+        headers = {
+            'Accept': 'application/vnd.akamai.cps.change-id.v1+json'
+        }
+        cps_cancel_url = self.driver.akamai_conf.policy_api_base_url + \
+                         change_url[1:]
+        cancel_cps = self.cps_api_client.delete(cps_cancel_url,
+                                                headers=headers)
+        if cancel_cps.ok:
+            status = "Successfully cancelled the CPS change {0}. " \
+                     "Delete domain operation will be deferred " \
+                     "until the certificate becomes available" \
+                .format(change_url)
+        else:
+            status = "CPS request failed to cancel the CPS change {0}." \
+                     "Delete domain operation will be attempted " \
+                     "again through retry logic".format(change_url)
+
+        LOG.info(status)
+        return self.responder.ssl_certificate_deleted(
+            cert_obj.domain_name,
+            {
+                'status': status,
+            }
+        )

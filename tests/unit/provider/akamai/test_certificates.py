@@ -936,15 +936,98 @@ class TestCertificates(base.TestCase):
         controller = certificates.CertificateController(self.driver)
 
         responder = controller.delete_certificate(cert_obj)
-
+        status = "Maybe the domain {} already removed? " \
+                 "Delete domain operation failed" \
+            .format(cert_obj.domain_name)
         self.assertEqual(
-            'failed',
+            status,
             responder['Akamai']['extra_info']['status']
         )
-        self.assertEqual(
-            'Domain does not exist on any certificate ',
-            responder['Akamai']['extra_info']['reason']
+
+    def test_domain_delete_with_pending_changes(self):
+        """Test cancelling CPS change.
+
+        Have an SNI certificate with pending change
+        and try to delete a domain from that certificate.
+
+        The delete operation should check for pending
+        changes on the certificate and should make
+        an Akamai call to cancel that pending change.
+        """
+        change_url = "/cps/v2/enrollments/234/changes/10000"
+        cert_obj = ssl_certificate.load_from_json({
+            "flavor_id": "flavor1",
+            "domain_name": "www.domain.com",
+            "cert_type": "sni",
+            "project_id": "0001",
+            "cert_details": {
+                "Akamai": {
+                    "extra_info": {
+                        "change_url": change_url
+                    }
+                }
+            }
+        })
+
+        controller = certificates.CertificateController(self.driver)
+        controller.cps_api_client.delete.return_value = mock.Mock(
+            ok=True
         )
+
+        status = "Successfully cancelled the CPS change {0}. " \
+                 "Delete domain operation will be deferred " \
+                 "until the certificate becomes available" \
+            .format(change_url)
+
+        responder = controller.delete_certificate(cert_obj)
+        self.assertEqual(
+            status,
+            responder['Akamai']['extra_info']['status']
+        )
+        controller.cps_api_client.delete.assert_called_once()
+
+    def test_domain_delete_with_pending_changes_failed(self):
+        """Test cancelling CPS change.
+
+        Have an SNI certificate with pending change
+        and try to delete a domain from that certificate.
+
+        The delete operation should check for pending
+        changes on the certificate and should make
+        an Akamai call to cancel that pending change.
+
+        Check for the error message when Akamai call fails.
+        """
+        change_url = "/cps/v2/enrollments/234/changes/10000"
+        cert_obj = ssl_certificate.load_from_json({
+            "flavor_id": "flavor1",
+            "domain_name": "www.domain.com",
+            "cert_type": "sni",
+            "project_id": "0001",
+            "cert_details": {
+                "Akamai": {
+                    "extra_info": {
+                        "change_url": change_url
+                    }
+                }
+            }
+        })
+
+        controller = certificates.CertificateController(self.driver)
+        controller.cps_api_client.delete.return_value = mock.Mock(
+            ok=False
+        )
+
+        status = "CPS request failed to cancel the CPS change {0}." \
+                 "Delete domain operation will be attempted " \
+                 "again through retry logic".format(change_url)
+
+        responder = controller.delete_certificate(cert_obj)
+        self.assertEqual(
+            status,
+            responder['Akamai']['extra_info']['status']
+        )
+        controller.cps_api_client.delete.assert_called_once()
 
     def test_cert_delete_sni_cert_pending_changes(self):
 
