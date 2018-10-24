@@ -202,7 +202,8 @@ class CertificateController(base.CertificateBase):
                     )
                     resp = self.sps_api_client.post(
                         self.sps_api_base_url.format(spsId=""),
-                        data=string_post_data.encode('utf-8')
+                        data=string_post_data.encode('utf-8'),
+                        headers={"Content-Type": "application/x-www-form-urlencoded"}
                     )
                     if resp.status_code != 202:
                         raise RuntimeError(
