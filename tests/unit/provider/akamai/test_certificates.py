@@ -143,7 +143,8 @@ class TestCertificates(base.TestCase):
             controller.sps_api_base_url.format(spsId=lastSpsId))
         controller.sps_api_client.post.assert_called_once_with(
             controller.sps_api_base_url.format(spsId=lastSpsId),
-            data=string_post_cert_info.encode('utf-8'))
+            data=string_post_cert_info.encode('utf-8'),
+            headers={"Content-Type": "application/x-www-form-urlencoded"})
         return
 
     @ddt.data(("CPS running", ""),
@@ -975,8 +976,6 @@ class TestCertificates(base.TestCase):
         )
 
         status = "Successfully cancelled the CPS change {0}. " \
-                 "Delete domain operation will be deferred " \
-                 "until the certificate becomes available" \
             .format(change_url)
 
         responder = controller.delete_certificate(cert_obj)
@@ -1025,7 +1024,7 @@ class TestCertificates(base.TestCase):
         responder = controller.delete_certificate(cert_obj)
         self.assertEqual(
             status,
-            responder['Akamai']['extra_info']['status']
+            responder['Akamai']['error']
         )
         controller.cps_api_client.delete.assert_called_once()
 
@@ -1070,15 +1069,17 @@ class TestCertificates(base.TestCase):
 
         responder = controller.delete_certificate(cert_obj)
 
-        self.assertEqual('www.abc.com', responder['Akamai']['cert_domain'])
-        self.assertEqual(
-            'failed due to pending changes',
-            responder['Akamai']['extra_info']['status']
+        status = "{0} has pending changes, skipping .." \
+                 "{1} delete will be deferred until the" \
+                 "{0} becomes available again".format(
+            "0", cert_obj.domain_name
         )
+
         self.assertEqual(
-            'Delete request for www.abc.com failed',
-            responder['Akamai']['extra_info']['reason']
+            status,
+            responder['Akamai']['error']
         )
+
 
     def test_cert_delete_sni_cert_positive(self):
 

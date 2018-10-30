@@ -25,7 +25,6 @@ LOG = log.getLogger(__name__)
 conf = cfg.CONF
 conf(project='poppy', prog='poppy', args=[])
 
-
 class DeleteProviderSSLCertificateTask(task.Task):
     default_provides = "responders"
 
@@ -51,10 +50,18 @@ class DeleteProviderSSLCertificateTask(task.Task):
                 service_controller._driver.providers[provider.lower()],
                 cert_obj,
             )
+
+            if responder:
+                if 'error' in responder[provider]:
+                    msg = "Failed to delete ssl certificate: {0} : due to {1}:" \
+                          "The delete operation will be retried".format(
+                        cert_obj.to_dict(), responder[provider]['error'])
+                    LOG.info(msg)
+                    raise Exception(msg)
+
             responders.append(responder)
 
         return responders
-
 
 class SendNotificationTask(task.Task):
 

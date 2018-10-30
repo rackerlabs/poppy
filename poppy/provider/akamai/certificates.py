@@ -599,16 +599,13 @@ class CertificateController(base.CertificateBase):
                 resp_json = json.loads(resp.text)
                 # check enrollment does not have any pending changes
                 if len(resp_json['pendingChanges']) > 0:
-                    LOG.info("{0} has pending changes, skipping...".format(
-                        found_cert))
-                    return self.responder.ssl_certificate_deleted(
-                        cert_obj.domain_name,
-                        {
-                            'status': 'failed due to pending changes',
-                            'reason': 'Delete request for {0} failed'
-                                .format(cert_obj.domain_name)
-                        }
+                    status = "{0} has pending changes, skipping .." \
+                             "{1} delete will be deferred until the" \
+                             "{0} becomes available again".format(
+                        found_cert, cert_obj.domain_name
                     )
+                    LOG.info(status)
+                    return self.responder.failed(status)
 
                 # remove domain name from sans
                 resp_json['csr']['sans'].remove(cert_obj.domain_name)
@@ -635,21 +632,12 @@ class CertificateController(base.CertificateBase):
                         'with id {0} Exception: {1}'.format(
                             enrollment_id, resp.text))
                 if resp.status_code != 202:
-                    LOG.error(
-                        "Certificate delete for {0} failed. "
-                        "Status code {1}. Response {2}.".format(
-                            cert_obj.domain_name,
-                            resp.status_code,
-                            resp.text,
-                        ))
-                    return self.responder.ssl_certificate_deleted(
-                        cert_obj.domain_name,
-                        {
-                            'status': 'failed',
-                            'reason': 'Delete request for {0} failed.'.format(
-                                cert_obj.domain_name)
-                        }
+                    status = "Certificate delete for {0} failed. " \
+                             "Status code {1}. Response {2}.".format(
+                        cert_obj.domain_name, resp.status_code, resp.text
                     )
+                    LOG.error(status)
+                    return self.responder.failed(status)
                 else:
                     LOG.info(
                         "Successfully cancelled {0}, {1}".format(
@@ -666,14 +654,10 @@ class CertificateController(base.CertificateBase):
                         }
                     )
             except Exception as exc:
-                LOG.exception(
-                    "Unable to delete certificate {0}, "
-                    "Error: {1}".format(cert_obj.domain_name, exc))
-                return self.responder.ssl_certificate_deleted(None, {
-                    'status': 'failed',
-                    'reason': "Delete cert type {} failed due to {}.".format(
-                            cert_obj.cert_type, exc)
-                })
+                status = "Unable to delete certificate {0}, " \
+                         "Error: {1}".format(cert_obj.domain_name, exc)
+                LOG.exception(status)
+                return self.responder.failed(status)
         else:
             return self.responder.ssl_certificate_provisioned(None, {
                 'status': 'ignored',
@@ -702,10 +686,27 @@ class CertificateController(base.CertificateBase):
         enrollment had an active change in progress at
         this point of time.
 
+        A failed responder message will be returned so that
+        the Taskflow can know that this ``delete domain``
+        operation should be retried at later time.
+
+        Example return:
+
+         .. code-block:: python
+
+             {
+                "Akamai":
+                    {
+                        "error": "Domain www.abc.com already removed?"
+                        "error_detail": "",
+                    }
+             }
+
         :param cert_obj: The SSL certificate object
         :type cert_obj: poppy.model.ssl_certificate.SSLCertificate
 
-        :return: A responder message with status of the operation
+        :return: Failed responder message so that the task can
+            be retried at later time
         :rtype: dict
         """
         try:
@@ -735,18 +736,18 @@ class CertificateController(base.CertificateBase):
                                                 headers=headers)
         if cancel_cps.ok:
             status = "Successfully cancelled the CPS change {0}. " \
-                     "Delete domain operation will be deferred " \
-                     "until the certificate becomes available" \
                 .format(change_url)
+            LOG.info(status)
+            return self.responder.ssl_certificate_deleted(
+                cert_obj.domain_name,
+                {
+                    'status': status
+                }
+            )
         else:
             status = "CPS request failed to cancel the CPS change {0}." \
                      "Delete domain operation will be attempted " \
                      "again through retry logic".format(change_url)
+            LOG.info(status)
+            return self.responder.failed(status)
 
-        LOG.info(status)
-        return self.responder.ssl_certificate_deleted(
-            cert_obj.domain_name,
-            {
-                'status': status,
-            }
-        )
