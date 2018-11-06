@@ -386,7 +386,9 @@ class DeleteCertsForRemovedDomains(task.Task):
         kwargs = {
             'project_id': project_id,
             'cert_type': 'san',
-            'context_dict': context_utils.get_current().to_dict()
+            'context_dict': context_utils.get_current().to_dict(),
+            'flavor_id': service_new.flavor_id,
+            'providers_list': service_new.provider_details.keys()
         }
 
         for domain in removed_domains:

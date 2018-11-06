@@ -16,6 +16,7 @@ import json
 import uuid
 
 import mock
+from mock import ANY
 from oslo_context import context as context_utils
 from taskflow import engines
 
@@ -129,6 +130,7 @@ class TestFlowRuns(base.TestCase):
         storage_controller._driver.close_connection = mock.Mock()
         service_controller.provider_wrapper.update = mock.Mock()
         service_controller.provider_wrapper.update._mock_return_value = []
+        service_controller.distributed_task_controller.submit_task = mock.Mock()
         service_controller._driver = mock.Mock()
         service_controller._driver.providers.__getitem__ = mock.Mock()
         dns_controller.update = mock.Mock()
@@ -1171,5 +1173,86 @@ class TestFlowRuns(base.TestCase):
 
             # Check that the delete_certificate() has been called
             # Five times(which is the retry count).
-            self.assertEqual(service_controller.provider_wrapper. \
+            self.assertEqual(service_controller.provider_wrapper.
                              delete_certificate.call_count, 5)
+
+    def test_delete_ssl_cert_kwargs(self):
+        """Test args for the delete_ssl_certificate flow.
+
+        Update a service with two domains in it by deleting
+        one domain from the service. Make sure the domains
+        are https. This should make the ``update_service taskflow``
+        to call ``delete_ssl_certificate taskflow``.
+
+        Test that the arguments passed to ``delete_ssl_certificate``
+        flow are correct.
+
+        Below is an example of arguments that the ``delete_ssl_certificate``
+        receives.
+
+        .. code-block:: python
+
+            kwargs = {
+                'project_id': '1234',
+                'cert_type': 'san',
+                'context_dict': {}
+                'flavor_id': 'cdn',
+                'providers_list': ['Akamai']
+            }
+        """
+        service_id = str(uuid.uuid4())
+        domain1 = domain.Domain(domain='cdn.poppy.org',
+                                protocol='https',
+                                certificate='sni')
+        domain2 = domain.Domain(domain='mycdn.poppy.org',
+                                protocol='https',
+                                certificate='sni')
+        domains_old = [domain1, domain2]
+        domains_new = [domain2]
+        current_origin = origin.Origin(origin='poppy.org')
+        service_old = service.Service(service_id=service_id,
+                                      name='poppy cdn service',
+                                      domains=domains_old,
+                                      origins=[current_origin],
+                                      flavor_id='cdn')
+        service_new = service.Service(service_id=service_id,
+                                      name='poppy cdn service',
+                                      domains=domains_new,
+                                      origins=[current_origin],
+                                      flavor_id='cdn')
+
+        kwargs = {
+            'project_id': json.dumps(str(uuid.uuid4())),
+            'auth_token': json.dumps(str(uuid.uuid4())),
+            'service_id': json.dumps(service_id),
+            'time_seconds': [i * self.time_factor
+                             for i in range(self.total_retries)],
+            'service_old': json.dumps(service_old.to_dict()),
+            'service_obj': json.dumps(service_new.to_dict()),
+            'context_dict': context_utils.RequestContext().to_dict()
+        }
+
+        (
+            service_controller,
+            storage_controller,
+            dns_controller,
+            ssl_cert_controller
+        ) = self.all_controllers()
+
+        with MonkeyPatchControllers(service_controller,
+                                    dns_controller,
+                                    storage_controller,
+                                    ssl_cert_controller,
+                                    memoized_controllers.task_controllers):
+            self.patch_update_flow(service_controller, storage_controller,
+                                   dns_controller)
+            engines.run(update_service.update_service(), store=kwargs)
+
+            service_controller.distributed_task_controller.submit_task. \
+                assert_called_once_with(ANY,
+                                        context_dict=ANY,
+                                        project_id=ANY,
+                                        cert_type='san',
+                                        domain_name=u'cdn.poppy.org',
+                                        flavor_id=u'cdn',
+                                        providers_list=[])
