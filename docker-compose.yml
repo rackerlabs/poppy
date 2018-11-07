@@ -1,0 +1,41 @@
+version: "3.7"
+
+services:
+  zookeeper:
+    image: jplock/zookeeper
+    ports:
+      - 2181:2181
+  cassandra:
+    image: library/cassandra
+    ports:
+      - 9160:9160
+      - 9042:9042
+  poppy:
+    build:
+      context: .
+      dockerfile: ./docker/dev/Dockerfile
+
+  poppy-server:
+    image: poppy_poppy
+    entrypoint: "run-server"
+    ports:
+      - 8888:8888
+    depends_on:
+      - cassandra
+      - zookeeper
+    volumes:
+      - .:/poppy
+
+  poppy-worker:
+    image: poppy_poppy
+    entrypoint: "run-worker"
+    volumes:
+      - .:/poppy
+    depends_on:
+      - cassandra
+      - zookeeper
+#    deploy:
+#      replicas: 6
+
+volumes:
+  poppy:

@@ -57,3 +57,6 @@ write_file
 
 #testr files
 .testrepository/*
+.env
+/docker/dev/poppy.conf
+/docker/dev/dev-requirements.txt

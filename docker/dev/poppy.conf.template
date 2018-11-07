@@ -1,0 +1,116 @@
+[DEFAULT]
+log_file = poppy.log
+log_config_append = /etc/logging.conf
+debug = True
+base_url = http://$PECAN_BIND_ADDRESS:$PECAN_BIND_PORT
+
+project_id_inf_url = True
+
+[drivers]
+transport = pecan
+manager = default
+dns = rackspace
+storage = cassandra
+providers = akamai
+
+[drivers:transport:pecan]
+bind = $PECAN_BIND_ADDRESS
+port = $PECAN_BIND_PORT
+
+[drivers:storage:cassandra]
+cluster = "cassandra"
+keyspace = poppy
+automatic_schema_migration = True
+consistency_level = LOCAL_QUORUM
+migrations_consistency_level = LOCAL_QUORUM
+max_schema_agreement_wait = 30
+replication_strategy = class:SimpleStrategy, replication_factor:1
+archive_on_delete = True
+migrations_path = /poppy/poppy/storage/cassandra/migrations/
+
+[drivers:dns]
+retries = 5
+
+[drivers:distributed_task:taskflow]
+jobboard_backend_type = zookeeper
+persistent_backend_type = zookeeper
+jobboard_backend_host = "zookeeper"
+jobboard_backend_port = 2181
+persistent_backend_host = "zookeeper"
+persistent_backend_port = 2181
+
+poppy_service_worker_path = '/taskflow/jobs/poppy_service_job'
+poppy_service_worker_jobboard = 'poppy_service_jobs'
+
+[drivers:provider:akamai]
+policy_api_client_token = "$MY_POLICY_API_CLIENT_TOKEN"
+policy_api_client_secret = "$MY_POLICY_API_CLIENT_SECRET"
+policy_api_access_token = "$MY_POLICY_API_ACCESS_TOKEN"
+policy_api_base_url = "$MY_POLICY_API_BASE_URL"
+
+ccu_api_client_token = "$MY_CCU_API_CLIENT_TOKEN"
+ccu_api_client_secret = "$MY_CCU_API_CLIENT_SECRET"
+ccu_api_access_token = "$MY_CCU_API_ACCESS_TOKEN"
+ccu_api_base_url = "$MY_CCU_API_BASE_URL"
+
+sps_api_client_token = "$MY_SPS_API_CLIENT_TOKEN"
+sps_api_client_secret = "$MY_SPS_API_CLIENT_SECRET"
+sps_api_access_token = "$MY_SPS_API_ACCESS_TOKEN"
+sps_api_base_url = "$MY_SPS_API_BASE_URL"
+
+akamai_access_url_link = "$MY_ACCESS_URL_LINK"
+akamai_https_access_url_suffix = edgekey.net
+akamai_http_config_number = '$MY_AKAMAI_HTTP_CONFIG_NUMBER'
+akamai_https_shared_config_number = '$MY_AKAMAI_HTTPS_CONFIG_SHARED_NUMBER'
+akamai_https_san_config_numbers = '$MY_AKAMAI_HTTPS_CONFIG_SAN_NUMBER'
+akamai_https_custom_config_numbers = '$MY_AKAMAI_HTTPS_CONFIG_CUSTOM_NUMBER'
+
+san_cert_cnames = $MY_SAN_CERT_LIST
+sni_cert_cnames = $MY_SNI_CERT_CNAMES
+sni_cert_enrollment_ids = $MY_SNI_CERT_ENROLLMENT_IDS
+
+
+san_cert_hostname_limit = 200
+akamai_https_sni_config_numbers = "$AKAMAI_HTTPS_SNI_CONFIG_NUMBERS"
+
+contract_id = "$AKAMAI_CONTRACT_ID"
+group_id = "$AKAMAI_GROUP_ID"
+
+san_info_storage_type = cassandra
+cert_info_storage_type = cassandra
+
+[drivers:dns:rackspace]
+username = "$RAX_DNS_USERNAME"
+api_key = "$RAX_DNS_API_KEY"
+use_shards = True
+num_shards = 400
+shard_prefix = "cdn"
+shared_ssl_num_shards = 5
+shared_ssl_shard_prefix = "scdn"
+shared_ssl_domain_suffix = "$RAX_DNS_SHARED_SSL_DOMAIN_SUFFIX"
+sni_ssl_domain_suffix = "$RAX_DNS_SNI_SSL_DOMAIN_SUFFIX"
+url = "$RAX_DNS_URL"
+url_404 = notfound.com
+email = "$MY_EMAIL_ADDRESS"
+auth_endpoint = ""
+timeout = 30
+delay = 1
+
+[drivers:notification:mailgun]
+mailgun_api_key = "$MAILGUN_API_KEY"
+mailgun_request_url = "$MAILGUN_REQUEST_URL"
+sand_box = "$MAILGUN_SAND_BOX"
+from_address = "$MAILGUN_FROM_ADDRESS"
+recipients = "$MAILGUN_RECIPIENTS"
+
+[drivers:provider:akamai:queue]
+queue_backend_type = zookeeper
+queue_backend_host = localhost
+queue_backend_port = 2181
+mod_san_queue_path = '/mod_san_queue'
+san_mapping_queue_path = '/san_mapping_queue'
+
+[log_delivery]
+identity_url = "https://$KEYSTONE_DOMAIN/v2.0/tokens"
+preferred_dcs = 'IAD'
+container_name = .CDN_ACCESS_LOGS
