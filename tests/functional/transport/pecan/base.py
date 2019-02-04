@@ -61,6 +61,8 @@ class BaseFunctionalTest(base.TestCase):
 
             mock_cert_info = mock.MagicMock()
             mock_cert_info.get_cert_config.return_value = {}
+            mock_cert_info.get_san_cert_hostname_limit.return_value = 0
+            mock_cert_info.update_cert_config.return_value = {}
 
             mod_san_q = mock.MagicMock()
             mod_san_q.traverse_queue.return_value = []

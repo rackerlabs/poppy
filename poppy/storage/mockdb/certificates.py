@@ -77,4 +77,5 @@ class CertificatesController(base.CertificatesController):
             if len(certs) == 1:
                 return certs[0]
             else:
-                return certs
+                raise ValueError("No matching certificates found for "
+                                 "the domain {}".format(domain_name))

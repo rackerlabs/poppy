@@ -152,11 +152,12 @@ class TestServicesState(base.FunctionalTest):
 
         self.assertEqual(response.status_code, 400)
 
-    @given(strategies.text(min_size=257))
-    def test_services_state_invalid_project_id(self, project_id):
+    def test_services_state_invalid_project_id(self):
         # NOTE(TheSriram): the min size is assigned to 257, since
         # project_id regex allows up to 256 chars
         # invalid project_id field
+        project_id = '_'.join([str(uuid.uuid4()) for i in range(7)])
+        self.assertTrue(len(project_id) > 256)
         self.req_body['project_id'] = project_id
         self.req_body['status'] = 'deployed'
         response = self.app.post(
