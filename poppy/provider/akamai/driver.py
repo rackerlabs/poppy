@@ -145,7 +145,7 @@ class CDNProvider(base.Driver):
         ])
         self.akamai_ccu_api_base_url = ''.join([
             str(self.akamai_conf.ccu_api_base_url),
-            'ccu/v2/queues/default'
+            'ccu/v3/{purge_type}/url/{network}'
         ])
         self.regions = geo_zone_code_mapping.REGIONS
         self.http_conf_number = self.akamai_conf.akamai_http_config_number
