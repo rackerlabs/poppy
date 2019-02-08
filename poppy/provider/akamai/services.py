@@ -559,69 +559,62 @@ class ServiceController(base.ServiceBase):
             return self.responder.deleted(provider_service_id)
 
     def purge(self, provider_service_id, service_obj, hard=True,
-              purge_url='/*'):
-        if not hard:
+              purge_url='/*', network='production'):
+        try:
             if not purge_url.startswith('/'):
                 purge_url = ('/' + purge_url)
-            return self._policy(provider_service_id, service_obj,
-                                invalidate=True, invalidate_url=purge_url)
-        else:
+
+            if not hard:
+                return self._policy(provider_service_id, service_obj,
+                                    invalidate=True, invalidate_url=purge_url)
+
+            if purge_url == '/*':
+                raise RuntimeError('Akamai purge-all functionality has not'
+                                  ' been implemented')
+            purge_type = 'delete'
             try:
+                policies = json.loads(provider_service_id)
+            except Exception:
+                # raise a more meaningful error for debugging info
+                msg = 'Mal-formed Akamai ' \
+                      'policy ids: {0}'.format(provider_service_id)
+                LOG.exception(msg)
+                raise RuntimeError(msg)
 
-                # Get the service
-                if purge_url == '/*':
-                    raise RuntimeError('Akamai purge-all functionality has not'
-                                       ' been implemented')
-                else:
-                    try:
-                        policies = json.loads(provider_service_id)
-                    except Exception:
-                        # raise a more meaningful error for debugging info
-                        try:
-                            msg = 'Mal-formed Akamai ' \
-                                  'policy ids: {0}'.format(provider_service_id)
-                            LOG.exception(msg)
-                            raise RuntimeError(msg)
-                        except Exception as e:
-                            return self.responder.failed(str(e))
+            for policy in policies:
+                url_scheme = None
+                if policy['protocol'] == 'http':
+                    url_scheme = 'http://'
+                elif policy['protocol'] == 'https':
+                    url_scheme = 'https://'
 
-                    for policy in policies:
-                        url_scheme = None
-                        if policy['protocol'] == 'http':
-                            url_scheme = 'http://'
-                        elif policy['protocol'] == 'https':
-                            url_scheme = 'https://'
+                actual_purge_url = ''.join([url_scheme,
+                                            policy['policy_name'],
+                                            purge_url])
+                data = {
+                    'objects': [
+                        actual_purge_url
+                    ]
+                }
 
-                        # purge_url has to be a full path
-                        # with a starting slash,
-                        # e.g: /cdntest.html
-                        if not purge_url.startswith('/'):
-                            purge_url = ('/' + purge_url)
-                        actual_purge_url = ''.join([url_scheme,
-                                                    policy['policy_name'],
-                                                    purge_url])
-                        data = {
-                            'objects': [
-                                actual_purge_url
-                            ]
-                        }
-                        resp = self.ccu_api_client.post(self.ccu_api_base_url,
-                                                        data=json.dumps(data),
-                                                        headers=(
-                                                            self.request_header
-                                                        ))
-                        if resp.status_code != 201:
-                            raise RuntimeError(resp.text)
-                        LOG.info("purge response: %s for project id: %s, "
-                                 "on: %s, purge_url: %s"
-                                 % (resp.text, service_obj.project_id,
-                                    provider_service_id, actual_purge_url))
-                    return self.responder.purged(provider_service_id,
-                                                 purge_url=purge_url)
-            except Exception as e:
-                LOG.exception("Failed to Purge/Invalidate Service - {0}".
-                              format(provider_service_id))
-                return self.responder.failed(str(e))
+                resp = self.ccu_api_client.post(self.ccu_api_base_url.format(
+                    purge_type=purge_type, network=network),
+                    data=json.dumps(data),
+                    headers=(
+                        self.request_header
+                    ))
+                if resp.status_code != 201:
+                    raise RuntimeError(resp.text)
+                LOG.info("purge response: %s for project id: %s, "
+                         "on: %s, purge_url: %s"
+                         % (resp.text, service_obj.project_id,
+                            provider_service_id, actual_purge_url))
+            return self.responder.purged(provider_service_id,
+                                         purge_url=purge_url)
+        except Exception as e:
+            LOG.exception("Failed to Purge/Invalidate Service - {0}".
+                          format(provider_service_id))
+            return self.responder.failed(str(e))
 
     def get_subcustomer_id(self, project_id, domain):
         # subcustomer_id now just set for project_id

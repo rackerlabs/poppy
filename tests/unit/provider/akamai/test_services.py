@@ -765,7 +765,7 @@ class TestServices(base.TestCase):
                                 service_obj=self.service_obj,
                                 hard=True, purge_url=purge_url)
         controller.ccu_api_client.post.assert_called_once_with(
-            controller.ccu_api_base_url,
+            controller.ccu_api_base_url.format(purge_type='delete', network='network'),
             data=json.dumps(data),
             headers=(
                 controller.request_header
@@ -777,27 +777,9 @@ class TestServices(base.TestCase):
                                            'protocol': 'https',
                                            'certificate': 'shared'}])
         controller = services.ServiceController(self.driver)
-
-        controller.subcustomer_api_client.get.return_value = \
-            mock.Mock(status_code=200,
-                      ok=True,
-                      content=json.dumps({"geo": "US"}))
-
-        controller.subcustomer_api_client.delete.return_value = \
-            mock.Mock(status_code=200,
-                      ok=True)
-
-        controller.policy_api_client.get.return_value = mock.Mock(
-            status_code=200,
-            text=json.dumps(dict(rules=[]))
-        )
-        controller.policy_api_client.put.return_value = mock.Mock(
-            status_code=200,
-            text='Put successful'
-        )
-        controller.policy_api_client.delete.return_value = mock.Mock(
-            status_code=200,
-            text='Delete successful'
+        controller.ccu_api_client.post.return_value = mock.Mock(
+            status_code=201,
+            text='Post succesful'
         )
         purge_url = '/img/abc.jpeg'
 
