@@ -160,9 +160,10 @@ class DefaultSSLCertificateController(base.SSLCertificateController):
 
 
         new_queue_data = [
-            json.dumps({'flavor_id':   r['flavor_id'],  # flavor_id
-                        'domain_name': r['domain_name'],    # domain_name
+            json.dumps({'flavor_id':   r['flavor_id'],
+                        'domain_name': r['domain_name'],
                         'project_id': r['project_id'],
+                        'cert_type': r['cert_type'],
                         'validate_service': r.get('validate_service', True)})
             for r in queue_data_list
         ]

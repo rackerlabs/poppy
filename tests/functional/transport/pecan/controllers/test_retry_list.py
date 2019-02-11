@@ -56,12 +56,14 @@ class TestRetryList(base.FunctionalTest):
                 "domain_name": "test-san1.cnamecdn.com",
                 "project_id": "000",
                 "flavor_id": "premium",
+                "cert_type": "sni",
                 "validate_service": False
             },
             {
                 "domain_name": "test-san2.cnamecdn.com",
                 "project_id": "000",
                 "flavor_id": "premium",
+                "cert_type": "sni",
                 "validate_service": False
             }
         ]
@@ -234,12 +236,14 @@ class TestRetryList(base.FunctionalTest):
                 "domain_name": "test-san1.cnamecdn.com",
                 "project_id": "000",
                 "flavor_id": "premium",
+                "cert_type": "sni",
                 "validate_service": False
             },
             {
                 "domain_name": "test-san2.cnamecdn.com",
                 "project_id": self.project_id,
                 "flavor_id": "premium",
+                "cert_type": "sni",
                 "validate_service": True
             }
         ]

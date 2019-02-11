@@ -250,6 +250,7 @@ class DefaultSSLCertificateControllerTests(base.TestCase):
             "domain_name": "a_domain",
             "project_id": "00000",
             "flavor_id": "flavor",
+            "cert_type": "sni",
             "validate_service": True
         }]
 
@@ -266,6 +267,7 @@ class DefaultSSLCertificateControllerTests(base.TestCase):
                 "domain_name": "b_domain",
                 "project_id": "00000",
                 "flavor_id": "flavor",
+                "cert_type": "sni",
                 "validate_service": True
             }
         ]

@@ -80,6 +80,11 @@ class SSLCertificateSchema(schema_base.SchemaBase):
                                                   '{1,256})$'),
                             'required': True,
                         },
+                        'cert_type': {
+                            'type': 'string',
+                            'required': True,
+                            'enum': ['san', 'sni'],
+                        },
                         'validate_service': {
                             'type': 'boolean'
                         }
