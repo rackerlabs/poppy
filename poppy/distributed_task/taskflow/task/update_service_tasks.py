@@ -362,9 +362,7 @@ class DeleteCertsForRemovedDomains(task.Task):
         service_old = service.load_from_json(service_old_json)
         old_domains = set([
             domain.domain for domain in service_old.domains
-            if domain.protocol == 'https'
-            and
-            domain.certificate in ['san', 'sni']
+            if domain.protocol == 'https' and domain.certificate == 'san'
         ])
 
         # get new domains
@@ -372,9 +370,7 @@ class DeleteCertsForRemovedDomains(task.Task):
         service_new = service.load_from_json(service_new_json)
         new_domains = set([
             domain.domain for domain in service_new.domains
-            if domain.protocol == 'https'
-            and
-            domain.certificate in ['san', 'sni']
+            if domain.protocol == 'https' and domain.certificate == 'san'
         ])
 
         removed_domains = old_domains.difference(new_domains)
@@ -386,9 +382,7 @@ class DeleteCertsForRemovedDomains(task.Task):
         kwargs = {
             'project_id': project_id,
             'cert_type': 'san',
-            'context_dict': context_utils.get_current().to_dict(),
-            'flavor_id': service_new.flavor_id,
-            'providers_list': service_new.provider_details.keys()
+            'context_dict': context_utils.get_current().to_dict()
         }
 
         for domain in removed_domains:

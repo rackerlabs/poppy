@@ -42,45 +42,12 @@ class BackgroundJobController(base.BackgroundJobController):
             a_driver.AKAMAI_GROUP].akamai_https_access_url_suffix
         self.akamai_san_cert_cname_list = self.driver.conf[
             a_driver.AKAMAI_GROUP].san_cert_cnames
-        self.akamai_sni_cert_cname_list = self.driver.conf[
-            a_driver.AKAMAI_GROUP].sni_cert_cnames
         self.notify_email_list = self.driver.conf[
             n_driver.MAIL_NOTIFICATION_GROUP].recipients
         self.cert_storage = self._driver.storage.certificates_controller
         self.service_storage = self._driver.storage.services_controller
 
     def post_job(self, job_type, kwargs):
-        """Submit a job to the Job board.
-
-        Iterate over each certificate in san mapping queue.
-        For each job type, build ``run_list`` and ``ignore_list`` of certificates
-        based on some logic while submitting jobs for those certificates
-        belonging to the run_list. San mapping queue may not be intact depending
-        on the job type. Return both run_list and ignore_list.
-
-        Valid job_type includes.
-          - akamai_check_and_update_cert_status
-          - akamai_update_papi_property_for_mod_san
-          - akamai_update_papi_property_for_mod_sni
-
-        Example return:
-
-        .. code-block:: python
-
-            ([{"domain_name": "one.example.com",
-                "project_id": "000",
-                "flavor_id": "cdn",
-                "cert_type": "sni"}],[])
-
-
-        :param str job_type: Type of the job
-        :param dict kwargs: Additional arguments
-
-        :return: Tuple of run_list and ignore_list
-        :rtype: tuple(list, list)
-
-        :raises NotImplementedError: if the job_type is not supported
-        """
         queue_data = []
 
         run_list = []
@@ -160,118 +127,96 @@ class BackgroundJobController(base.BackgroundJobController):
                 cert_dict = dict()
                 try:
                     cert_dict = json.loads(cert)
-                    if cert_dict['cert_type'] == 'san':
-                        # add validation that the domain still exists on a
-                        # service and that it has a type of SAN
-                        cert_obj = ssl_certificate.SSLCertificate(
-                            cert_dict['flavor_id'],
-                            cert_dict['domain_name'],
-                            cert_dict['cert_type'],
-                            project_id=cert_dict['project_id']
-                        )
+                    # add validation that the domain still exists on a
+                    # service and that it has a type of SAN
+                    cert_obj = ssl_certificate.SSLCertificate(
+                        cert_dict['flavor_id'],
+                        cert_dict['domain_name'],
+                        'san',
+                        project_id=cert_dict['project_id']
+                    )
 
-                        try:
-                            self.cert_storage.get_certs_by_domain(
-                                    cert_obj.domain_name,
-                                    project_id=cert_obj.project_id,
-                                    flavor_id=cert_obj.flavor_id,
-                                    cert_type=cert_obj.cert_type
-                                )
-                        except ValueError:
-                            ignore_list.append(cert_dict)
-                            LOG.info(
-                                "Ignored property update because "
-                                "certificate for {0} does not exist.".format(
-                                    cert_obj.domain_name
-                                )
-                            )
-                            continue
-
-                        if cert_dict.get('property_activated', False) is True:
-                            ignore_list.append(cert_dict)
-                            LOG.info(
-                                "{0} ignored for property update because "
-                                "hostname has already been activated. "
-                                "Set property_activated = False to "
-                                "activation.".format(cert_obj.domain_name))
-                            continue
-
-                        service_obj = self.service_storage.\
-                            get_service_details_by_domain_name(
-                                cert_obj.domain_name,
-                                cert_obj.project_id
-                            )
-                        if service_obj is None:
-                            ignore_list.append(cert_dict)
-                            LOG.info(
-                                "Ignored property update because "
-                                "Service not found for domain {0}".format(
-                                    cert_obj.domain_name
-                                )
-                            )
-                            continue
-
-                        found = False
-                        for domain in service_obj.domains:
-                            if (
-                                domain.domain == cert_obj.domain_name and
-                                domain.protocol == 'https' and
-                                domain.certificate == 'san'
-                            ):
-                                found = True
-                        if found is False:
-                            # skip the task for current cert obj if the
-                            # domain doesn't exist on a service with the
-                            # same protocol and certificate.
-                            ignore_list.append(cert_dict)
-                            LOG.info(
-                                "Ignored update property for domain "
-                                "'{0}' that no longer exists on a service "
-                                "with the same protocol 'https' and "
-                                "certificate type '{1}'".format(
-                                    cert_obj.domain_name,
-                                    cert_obj.cert_type
-                                )
-                            )
-                            continue
-                        domain_name = cert_dict["domain_name"]
-                        san_cert = (
-                            cert_dict["cert_details"]
-                            ["Akamai"]["extra_info"]["san cert"]
-                        )
+                    cert_for_domain = self.cert_storage.get_certs_by_domain(
+                        cert_obj.domain_name,
+                        project_id=cert_obj.project_id,
+                        flavor_id=cert_obj.flavor_id,
+                        cert_type=cert_obj.cert_type
+                    )
+                    if cert_for_domain == []:
+                        ignore_list.append(cert_dict)
                         LOG.info(
-                            "{0}: {1} to {2}, on property: {3}".format(
-                                kwargs.get("action", 'add'),
-                                domain_name,
-                                san_cert,
-                                kwargs.get(
-                                    "property_spec",
-                                    'akamai_https_san_config_numbers'
-                                )
+                            "Ignored property update because "
+                            "certificate for {0} does not exist.".format(
+                                cert_obj.domain_name
                             )
                         )
+                        continue
 
-                        # Note(tonytan4ever): Put this check here so erroneous
-                        # san cert params will not pass. Support occasionally
-                        # put in the ending "edgekey.net"
-                        # (e.g: securexxx.san1.abc.com.edgekey.net), this check
-                        # will effectively error that out
-                        if san_cert not in self.akamai_san_cert_cname_list:
-                            raise ValueError(
-                                "Not A valid san cert cname: {0}, "
-                                "valid san cert cnames are: {1}".format(
-                                    san_cert,
-                                    self.akamai_san_cert_cname_list
-                                )
+                    service_obj = self.service_storage.\
+                        get_service_details_by_domain_name(
+                            cert_obj.domain_name,
+                            cert_obj.project_id
+                        )
+                    found = False
+                    for domain in service_obj.domains:
+                        if (
+                            domain.domain == cert_obj.domain_name and
+                            domain.protocol == 'https' and
+                            domain.certificate == 'san'
+                        ):
+                            found = True
+                    if found is False:
+                        # skip the task for current cert obj is the
+                        # domain doesn't exist on a service with the
+                        # same protocol and certificate.
+                        ignore_list.append(cert_dict)
+                        LOG.info(
+                            "Ignored update property for a "
+                            "domain '{0}' that no longer exists on a service "
+                            "with the same protocol 'https' and certificate "
+                            "type 'san'".format(
+                                cert_obj.domain_name,
                             )
-                        cname_host_info_list.append({
-                            "cnameFrom": domain_name,
-                            "cnameTo": '.'.join(
-                                [san_cert, self.akamai_san_cert_suffix]
-                            ),
-                            "cnameType": "EDGE_HOSTNAME"
-                        })
-                        run_list.append(cert_dict)
+                        )
+                        continue
+                    domain_name = cert_dict["domain_name"]
+                    san_cert = (
+                        cert_dict["cert_details"]
+                        ["Akamai"]["extra_info"]["san cert"]
+                    )
+                    LOG.info(
+                        "{0}: {1} to {2}, on property: {3}".format(
+                            kwargs.get("action", 'add'),
+                            domain_name,
+                            san_cert,
+                            kwargs.get(
+                                "property_spec",
+                                'akamai_https_san_config_numbers'
+                            )
+                        )
+                    )
+
+                    # Note(tonytan4ever): Put this check here so erroneous san
+                    # cert params will not pass. Support occasionally put in
+                    # the ending "edgekey.net"
+                    # (e.g: securexxx.san1.abc.com.edgekey.net), this check
+                    # will effectively error that out
+                    if san_cert not in self.akamai_san_cert_cname_list:
+                        raise ValueError(
+                            "Not A valid san cert cname: {0}, "
+                            "valid san cert cnames are: {1}".format(
+                                san_cert,
+                                self.akamai_san_cert_cname_list
+                            )
+                        )
+                    cname_host_info_list.append({
+                        "cnameFrom": domain_name,
+                        "cnameTo": '.'.join(
+                            [san_cert, self.akamai_san_cert_suffix]
+                        ),
+                        "cnameType": "EDGE_HOSTNAME"
+                    })
+                    run_list.append(cert_dict)
                 except Exception as e:
                     cert_dict['error_message'] = str(e)
                     ignore_list.append(cert_dict)
@@ -310,164 +255,6 @@ class BackgroundJobController(base.BackgroundJobController):
                 )
 
             return run_list, ignore_list
-        elif job_type == 'akamai_update_papi_property_for_mod_sni':
-            # this task leaves the san mapping queue intact,
-            # once items are successfully processed they are marked as
-            # ready for the next job type execution
-            if 'akamai' in self._driver.providers:
-                akamai_driver = self._driver.providers['akamai'].obj
-                queue_data += akamai_driver.san_mapping_queue.traverse_queue()
-
-            cname_host_info_list = []
-
-            for cert in queue_data:
-                cert_dict = dict()
-                try:
-                    cert_dict = json.loads(cert)
-                    if cert_dict['cert_type'] == 'sni':
-                        # validate that the domain still exists on a
-                        # service and that it has a type of SAN
-                        cert_obj = ssl_certificate.SSLCertificate(
-                            cert_dict['flavor_id'],
-                            cert_dict['domain_name'],
-                            cert_dict['cert_type'],
-                            project_id=cert_dict['project_id']
-                        )
-
-                        try:
-                            self.cert_storage.get_certs_by_domain(
-                                    cert_obj.domain_name,
-                                    project_id=cert_obj.project_id,
-                                    flavor_id=cert_obj.flavor_id,
-                                    cert_type=cert_obj.cert_type
-                                )
-                        except ValueError:
-                            ignore_list.append(cert_dict)
-                            LOG.info(
-                                "Ignored property update because "
-                                "certificate for {0} does not exist.".format(
-                                    cert_obj.domain_name
-                                )
-                            )
-                            continue
-
-                        service_obj = self.service_storage.\
-                            get_service_details_by_domain_name(
-                                cert_obj.domain_name,
-                                cert_obj.project_id
-                            )
-                        if service_obj is None:
-                            ignore_list.append(cert_dict)
-                            LOG.info(
-                                "Ignored property update because "
-                                "Service not found for domain {0}".format(
-                                    cert_obj.domain_name
-                                )
-                            )
-                            continue
-                        if cert_dict.get('property_activated', False) is True:
-                            ignore_list.append(cert_dict)
-                            LOG.info(
-                                "{0} ignored for property update because "
-                                "hostname has already been activated. "
-                                "Set property_activated = False to "
-                                "activation.".format(cert_obj.domain_name))
-                            continue
-
-                        found = False
-                        for domain in service_obj.domains:
-                            if (
-                                domain.domain == cert_obj.domain_name and
-                                domain.protocol == 'https' and
-                                domain.certificate == cert_obj.cert_type
-                            ):
-                                found = True
-                        if found is False:
-                            # skip the task for current cert obj is the
-                            # domain doesn't exist on a service with the
-                            # same protocol and certificate.
-                            ignore_list.append(cert_dict)
-                            LOG.info(
-                                "Ignored update property for domain "
-                                "'{0}' that no longer exists on a service "
-                                "with the same protocol 'https' and  "
-                                "certificate type '{1}'".format(
-                                    cert_obj.domain_name,
-                                    cert_obj.cert_type
-                                )
-                            )
-                            continue
-                        domain_name = cert_dict["domain_name"]
-                        sni_cert = (
-                            cert_dict["cert_details"]
-                            ["Akamai"]["extra_info"]["sni_cert"]
-                        )
-                        LOG.info(
-                            "{0}: {1} to {2}, on property: {3}".format(
-                                kwargs.get("action", 'add'),
-                                domain_name,
-                                sni_cert,
-                                kwargs.get(
-                                    "property_spec",
-                                    'akamai_https_sni_config_numbers'
-                                )
-                            )
-                        )
-
-                        if sni_cert not in self.akamai_sni_cert_cname_list:
-                            raise ValueError(
-                                "Not a valid sni cert cname: {0}, "
-                                "valid sni cert cnames are: {1}".format(
-                                    sni_cert,
-                                    self.akamai_sni_cert_cname_list
-                                )
-                            )
-                        cname_host_info_list.append({
-                            "cnameFrom": domain_name,
-                            "cnameTo": '.'.join(
-                                [sni_cert, self.akamai_san_cert_suffix]
-                            ),
-                            "cnameType": "EDGE_HOSTNAME"
-                        })
-                        run_list.append(cert_dict)
-                except Exception as e:
-                    cert_dict['error_message'] = str(e)
-                    ignore_list.append(cert_dict)
-                    LOG.exception(e)
-
-            update_info_list = json.dumps([
-                (
-                    kwargs.get("action", 'add'),
-                    cname_host_info_list
-                )
-            ])
-
-            t_kwargs = {
-                "property_spec": kwargs.get(
-                    "property_spec",
-                    'akamai_https_sni_config_numbers'
-                ),
-                "update_type": kwargs.get("update_type", 'hostnames'),
-                "update_info_list": update_info_list,
-                "notify_email_list": self.notify_email_list
-            }
-
-            # check to see if there are changes to be made before submitting
-            # the task, avoids creating a new property version when there are
-            # no changes to be made.
-            if len(cname_host_info_list) > 0:
-                self.distributed_task_controller.submit_task(
-                    update_property_flow.update_property_flow,
-                    **t_kwargs)
-            else:
-                LOG.info(
-                    "No tasks submitted to update_property_flow"
-                    "update_info_list was empty: {0}".format(
-                        update_info_list
-                    )
-                )
-
-            return run_list, ignore_list
         else:
             raise NotImplementedError(
                 'job type: {0} has not been implemented'.format(
@@ -476,11 +263,6 @@ class BackgroundJobController(base.BackgroundJobController):
             )
 
     def get_san_mapping_list(self):
-        """Get items from SAN mapping queue.
-
-        :return: List of SAN mapping items
-        :rtype: list
-        """
         res = []
         if 'akamai' in self._driver.providers:
             akamai_driver = self._driver.providers['akamai'].obj
@@ -491,13 +273,6 @@ class BackgroundJobController(base.BackgroundJobController):
         return res
 
     def put_san_mapping_list(self, san_mapping_list):
-        """Override san_mapping_queue with new certificate objects.
-
-        :param list san_mapping_list: New certificates
-
-        :return: Tuple of new and deleted certs in the san_mapping_queue
-        :rtype: tuple(list, list)
-        """
         new_queue_data = [json.dumps(r) for r in san_mapping_list]
         res, deleted = [], []
         if 'akamai' in self._driver.providers:
@@ -516,20 +291,6 @@ class BackgroundJobController(base.BackgroundJobController):
         return res, deleted
 
     def delete_http_policy(self):
-        """Submit task to delete Provider's(Akamai's) obsolete http policies.
-
-        Get all the http_policies available from the provider's policy queue
-        by consuming the queue (meaning queue will be empty after consume). For
-        each consumed policy, get certificates by domain. If the certificates are
-        empty for a domain, add that policy to ignore_list. If the certificate
-        status is not yet deployed, then add that policy to ignore_list and put it
-        back to policy queue so that it can be consumed in a later trial. Put rest
-        of the policies into run_list and submit a task to delete these policies.
-        Return ignored_list and run_list.
-
-        :return: Tuple of deleted and ignored policies
-        :rtype: tuple(list, list)
-        """
         http_policies = []
         run_list = []
         ignore_list = []
@@ -542,13 +303,12 @@ class BackgroundJobController(base.BackgroundJobController):
             http_policies = util.remove_duplicates(http_policies)
 
             for policy_dict in http_policies:
-                try:
-                    cert_for_domain = self.cert_storage.get_certs_by_domain(
-                        policy_dict['policy_name'],
-                        project_id=policy_dict['project_id'],
-                        cert_type='san'
-                    )
-                except ValueError:
+                cert_for_domain = self.cert_storage.get_certs_by_domain(
+                    policy_dict['policy_name'],
+                    project_id=policy_dict['project_id'],
+                    cert_type='san'
+                )
+                if cert_for_domain == []:
                     ignore_list.append(policy_dict)
                     LOG.info(
                         "No cert found for policy name. "

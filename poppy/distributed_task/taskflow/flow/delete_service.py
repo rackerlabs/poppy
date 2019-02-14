@@ -43,7 +43,7 @@ def delete_service():
         delete_service_tasks.GatherProviderDetailsTask(
             rebind=['responders', 'dns_responder']),
         linear_flow.Flow('Delete san certificates for service').add(
-            delete_service_tasks.DeleteCertificatesForService()
+            delete_service_tasks.DeleteCertificatesForServiceSanDomains()
         ),
         linear_flow.Flow('Delete service storage operation').add(
             common.UpdateProviderDetailIfNotEmptyTask(

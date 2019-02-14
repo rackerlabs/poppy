@@ -63,11 +63,6 @@ class DefaultServicesController(base.ServicesController):
         self.provider_conf = self.driver.conf[PROVIDER_GROUP]
 
     def determine_sleep_times(self):
-        """Calculate sleep times used in rebind.
-
-        :return: List of times (in seconds) to sleep using exponential backoff
-        :rtype: list
-        """
 
         determined_sleep_time = \
             random.randrange(self.dns_conf.min_backoff_range,
@@ -79,15 +74,6 @@ class DefaultServicesController(base.ServicesController):
         return backoff
 
     def _get_provider_details(self, project_id, service_id):
-        """Return Provider details for given project and service ids.
-
-        :param unicode project_id: The project id
-        :param unicode service_id: The service id
-        :return: Provider details for the given project and service ids
-        :rtype: dict[str, poppy.model.helpers.provider_details.ProviderDetail]
-
-        :raises LookupError: if the service does not exists
-        """
         try:
             provider_details = self.storage_controller.get_provider_details(
                 project_id,
@@ -98,15 +84,6 @@ class DefaultServicesController(base.ServicesController):
         return provider_details
 
     def get_service_by_domain_name(self, domain_name):
-        """Return service details for given domain name.
-
-        :param unicode domain_name: The domain name
-        :return: The service details
-        :rtype: poppy.model.service.Service
-
-        :raises LookupError: if the domain does not exists
-          or service details can not be found for the domain
-        """
         try:
             service_details = self.storage_controller\
                 .get_service_details_by_domain_name(domain_name)
@@ -121,19 +98,6 @@ class DefaultServicesController(base.ServicesController):
         return service_details
 
     def get_services_by_status(self, status):
-        """Return the services by status.
-
-        Currently supported statuses include:
-         - create_in_progress
-         - deployed
-         - update_in_progress
-         - delete_in_progress
-         - failed
-
-        :param unicode status: The status of the service
-        :return: List of services
-        :rtype: list
-        """
 
         services_project_ids = \
             self.storage_controller.get_services_by_status(status)
@@ -141,12 +105,6 @@ class DefaultServicesController(base.ServicesController):
         return services_project_ids
 
     def get_domains_by_provider_url(self, provider_url):
-        """Return domains by Provider url.
-
-        :param unicode provider_url: The provider URL
-        :return: List of domains
-        :rtype: list
-        """
 
         domains = \
             self.storage_controller.get_domains_by_provider_url(provider_url)
@@ -154,14 +112,6 @@ class DefaultServicesController(base.ServicesController):
         return domains
 
     def _append_defaults(self, service_json, operation='create'):
-        """Add defaults to the service.
-
-        If the service rules are None or Empty, add default rule.
-        If the operation is 'create', add default ttl and cache.
-
-        :param dict service_json: Service object represented as a dict
-        :param str operation: (Default 'create') Name of operation
-        """
         # default origin rule
         for origin in service_json.get('origins', []):
             if origin.get('rules') is None:
@@ -199,40 +149,31 @@ class DefaultServicesController(base.ServicesController):
                 caching_entry['rules'].append(default_rule.to_dict())
 
     def get_services(self, project_id, marker=None, limit=None):
-        """Get list of services.
+        """Get a list of services.
 
-        :param unicode project_id: The project id
-        :param int marker: Starting position of the pagination
-        :param int limit: Number of services to fetch
-
-        :return: List of services
-        :rtype: list(poppy.model.service.Service)
+        :param project_id
+        :param marker
+        :param limit
+        :return list
         """
         return self.storage_controller.get_services(project_id, marker, limit)
 
     def get_service(self, project_id, service_id):
-        """Get a service object.
+        """get.
 
-        :param unicode project_id: The project id
-        :param unicode service_id: The service id
-
-        :return: The service object
-        :rtype: poppy.model.services.Service
+        :param project_id
+        :param service_id
+        :return controller
         """
         return self.storage_controller.get_service(project_id, service_id)
 
     def create_service(self, project_id, auth_token, service_json):
-        """Create a new service.
+        """create.
 
-        :param unicode project_id: The project id
-        :param unicode auth_token: Token for authorization
-        :param dict service_json: The service details to create
-
-        :return: The new service object created
-        :rtype: poppy.model.service.Service
-
-        :raises LookupError: if the flavor does not exists
-        :raises ValueError: if shard domain retry operation has problem
+        :param project_id
+        :param auth_token
+        :param service_json
+        :raises LookupError, ValueError
         """
         try:
             flavor = self.flavor_controller.get(service_json.get('flavor_id'))
@@ -309,19 +250,14 @@ class DefaultServicesController(base.ServicesController):
 
     def update_service(self, project_id, service_id,
                        auth_token, service_updates, force_update=False):
-        """Update a service.
+        """update.
 
-        :param unicode project_id: The project id
-        :param unicode service_id: The service id
-        :param unicode auth_token: Token for authorization
-        :param list service_updates: The service details
-        :param bool force_update: (Default False) Forceful update \
-          of the service
-
-        :raises ServiceNotFound: if service not found
-        :raises ServiceStatusDisabled: if service is disabled
-        :raises ServiceStatusNeitherDeployedNorFailed: if force_update
-          is False and service is neither deployed nor failed
+        :param project_id
+        :param service_id
+        :param auth_token
+        :param service_updates
+        :param force_update
+        :raises LookupError, ValueError
         """
         # get the current service object
         try:
@@ -353,16 +289,16 @@ class DefaultServicesController(base.ServicesController):
                 domain.domain = customer_domain
 
             # old domains need to bind as well
-            elif domain.certificate in ['san', 'sni']:
-                try:
-                    domain.cert_info = (
-                        self.ssl_certificate_storage.get_certs_by_domain(
-                            domain.domain,
-                            project_id=project_id,
-                            flavor_id=service_old.flavor_id,
-                            cert_type=domain.certificate))
-                except ValueError:
-                    domain.cert_info = None
+            elif domain.certificate == 'san':
+                cert_for_domain = (
+                    self.ssl_certificate_storage.get_certs_by_domain(
+                        domain.domain,
+                        project_id=project_id,
+                        flavor_id=service_old.flavor_id,
+                        cert_type=domain.certificate))
+                if cert_for_domain == []:
+                    cert_for_domain = None
+                domain.cert_info = cert_for_domain
 
         service_old_json = json.loads(json.dumps(service_old.to_dict()))
 
@@ -415,16 +351,16 @@ class DefaultServicesController(base.ServicesController):
                             customer_domain,
                             service_new.service_id,
                             store)
-                elif domain.certificate in ['san', 'sni']:
-                    try:
-                        domain.cert_info = (
-                            self.ssl_certificate_storage.get_certs_by_domain(
-                                domain.domain,
-                                project_id=project_id,
-                                flavor_id=service_new.flavor_id,
-                                cert_type=domain.certificate))
-                    except ValueError:
-                        domain.cert_info = None
+                elif domain.certificate == 'san':
+                    cert_for_domain = (
+                        self.ssl_certificate_storage.get_certs_by_domain(
+                            domain.domain,
+                            project_id=project_id,
+                            flavor_id=service_new.flavor_id,
+                            cert_type=domain.certificate))
+                    if cert_for_domain == []:
+                        cert_for_domain = None
+                    domain.cert_info = cert_for_domain
 
                     # retrofit the access url info into
                     # certificate_info table
@@ -540,27 +476,12 @@ class DefaultServicesController(base.ServicesController):
         return
 
     def services_limit(self, project_id, limit):
-        """Set limit for number of services for a given project.
-
-        :param unicode project_id: The project id
-        :param int limit: No of services
-        """
         self.storage_controller.set_service_limit(
             project_id=project_id,
             project_limit=limit)
 
     def set_service_provider_details(self, project_id, service_id,
                                      auth_token, status):
-        """Set provider details for a given service.
-
-        :param unicode project_id: The project id
-        :param unicode service_id: The service id
-        :param unicode auth_token: Token for authorization
-        :param str status: Status of the service
-
-        :return: Http status code 201 or 202
-        :rtype: int
-        """
         old_service = self.storage_controller.get_service(
             project_id,
             service_id
@@ -581,13 +502,6 @@ class DefaultServicesController(base.ServicesController):
         return 201
 
     def get_services_limit(self, project_id):
-        """Get the currently set limit on services for a given project.
-
-        :param unicode project_id: The project id
-
-        :return: The dict with limit's value
-        :rtype: dict[str, int]
-        """
         limit = self.storage_controller.get_service_limit(
             project_id=project_id)
 
@@ -596,18 +510,6 @@ class DefaultServicesController(base.ServicesController):
         }
 
     def _action_per_service_obj(self, project_id, action, service_obj):
-        """Perform an action on the service.
-
-        List of actions include
-         - delete
-         - enable
-         - disable
-
-        :param unicode project_id: The project id
-        :param str action: Action needs to be done
-        :param service_obj: The service object
-        :type service_obj: poppy.model.service.Service
-        """
 
         kwargs = {
             'project_id': project_id,
@@ -644,20 +546,13 @@ class DefaultServicesController(base.ServicesController):
                             str(e)))
 
     def services_action(self, project_id, action, domain=None):
-        """perform action on services present in this domain.
+        """perform action on services
 
-        If domain is None, The action is performed on all the
-        services for a project. Else, the action will be
-        performed on those services present in the given domain.
+        :param project_id
+        :param action
+        :param domain
 
-        List of actions include
-         - delete
-         - enable
-         - disable
-
-        :param unicode project_id: The project id
-        :param str action: Action needs to done
-        :param unicode domain: The name of the domain
+        :raises ValueError
         """
 
         # list all the services of for this project_id
@@ -692,13 +587,11 @@ class DefaultServicesController(base.ServicesController):
         return
 
     def delete_service(self, project_id, service_id):
-        """Submit a task to delete a service.
+        """delete.
 
-        Before deletion, update each of the provider's status in
-        service with 'delete_in_progress'
-
-        :param unicode project_id: The project id
-        :param unicode service_id: The service id
+        :param project_id
+        :param service_id
+        :raises LookupError
         """
         service_obj = self.storage_controller.get_service(
             project_id, service_id)
@@ -732,29 +625,7 @@ class DefaultServicesController(base.ServicesController):
         return
 
     def purge(self, project_id, service_id, hard=False, purge_url=None):
-        """Purge the contents of a service.
-
-        Example purge_urls (from least specific to most specific):
-        - Whole-site wildcard, such as ``/*``
-        - URL path, such as ``/images/*``
-        - Detailed URL path, such as ``/images/logos/partnerA/*``
-        - File extension, such as ``/*.png``
-
-
-        If purge_url is none, all content of this service will be purged.
-
-        If ``hard`` is False, status of the each provider details
-        will be set to 'update_in_progress'
-
-        :param unicode project_id: The project id
-        :param unicode service_id: The service id
-        :param bool hard: (Default False) Mark 'update_in_progress' \
-           if set to True
-        :param unicode purge_url: The purge url
-
-        :raises ServiceStatusNotDeployed: if service not yet deployed
-        :raises LookupError: if the service does not exists
-        """
+        """If purge_url is none, all content of this service will be purge."""
         try:
             service_obj = self.storage_controller.get_service(
                 project_id,
@@ -802,16 +673,6 @@ class DefaultServicesController(base.ServicesController):
         return
 
     def _generate_shared_ssl_domain(self, domain_name, store):
-        """Generate shared ssl domain.
-
-        :param unicode domain_name: The domain name
-        :param unicode store: uuid
-
-        :return: Shared ssl domain
-        :rtype: unicode
-
-        :raises SharedShardsExhausted: if domain has already been taken
-        """
         try:
             if not hasattr(self, store):
                 gen_store = {
@@ -839,15 +700,6 @@ class DefaultServicesController(base.ServicesController):
                 'Domain {0} has already been taken'.format(domain_name))
 
     def _pick_shared_ssl_domain(self, domain, service_id, store):
-        """Select an available shared ssl domain.
-
-        :param unicode domain: The domain name
-        :param unicode service_id: The service id
-        :param unicode store: uuid
-
-        :return: The available domain
-        :rtype: unicode
-        """
         shared_ssl_domain = self._generate_shared_ssl_domain(
             domain,
             store)
@@ -860,19 +712,6 @@ class DefaultServicesController(base.ServicesController):
         return shared_ssl_domain
 
     def _shard_retry(self, project_id, service_obj, store=None):
-        """Retry to get available ssl domain and add to service.
-
-        :param unicode project_id: The project id
-        :param service_obj: The service object
-        :type service_obj: poppy.model.service.Service
-
-        :param unicode store: The store object
-
-        :return: The service object with shared ssl domain added
-        :rtype: poppy.model.service.Service
-
-        :raises ValueError:
-        """
         # deal with shared ssl domains
         try:
             for domain in service_obj.domains:
@@ -896,27 +735,6 @@ class DefaultServicesController(base.ServicesController):
 
     def migrate_domain(self, project_id, service_id, domain_name, new_cert,
                        cert_status='deployed'):
-        """Migrate domain.
-
-        Domain migration includes
-         - Set cert_status to all the provider's domain_certification
-         - Update the all the certificates with cert_status
-         - Update the access_url of all the providers with new_cert
-
-        As of now, below are the supported statuses.
-         - create_in_progress
-         - deployed
-         - failed
-         - cancelled
-
-        :param unicode project_id: The project id
-        :param unicode service_id: The service id
-        :param unicode domain_name: The domain name
-        :param unicode new_cert: The new certificate
-        :param unicode cert_status: (Default 'deployed')Certificate status
-
-        :raises ServiceNotFound: if the service not found
-        """
         dns_controller = self.dns_controller
         storage_controller = self.storage_controller
 
@@ -938,13 +756,13 @@ class DefaultServicesController(base.ServicesController):
             # from the query below. Once additional flavors are added, a
             # query for the service object rather than provider details only
             # should provide the flavor id to use in the query below
-            try:
-                cert_obj = self.ssl_certificate_storage.get_certs_by_domain(
-                    domain_name,
-                    project_id=project_id,
-                    cert_type='san'
-                )
+            cert_obj = self.ssl_certificate_storage.get_certs_by_domain(
+                domain_name,
+                project_id=project_id,
+                cert_type='san'
+            )
 
+            if cert_obj != []:
                 # cert was found, update the cert status
                 cert_details = cert_obj.cert_details
                 cert_details[provider]['extra_info']['status'] = cert_status
@@ -956,10 +774,6 @@ class DefaultServicesController(base.ServicesController):
                     cert_obj.flavor_id,
                     cert_details
                 )
-            except ValueError:
-                LOG.info("No matching certificate found for the "
-                         "combination of {0} and {1} and {2} "
-                         "".format(domain_name, project_id, 'san'))
 
             for url in provider_details[provider].access_urls:
                 if url.get('domain') == domain_name:
@@ -988,17 +802,6 @@ class DefaultServicesController(base.ServicesController):
             )
 
     def _detect_upgrade_http_to_https(self, old_domains, new_domain):
-        """Determine whether upgrade is required from http to https.
-
-        :param old_domains: List of old domains
-        :type old_domains: list(poppy.model.helpers.domain.Domain)
-
-        :param new_domain: New domain
-        :type new_domain: poppy.model.helpers.domain.Domain
-
-        :return: Boolean value indicating upgrade is required or not
-        :rtype: bool
-        """
         is_upgrade = False
         for old_domain in old_domains:
             if old_domain.domain == new_domain.domain:
@@ -1009,97 +812,3 @@ class DefaultServicesController(base.ServicesController):
                     is_upgrade = True
                     break
         return is_upgrade
-
-    def update_access_url_service(
-            self, project_id, service_id, access_url_changes):
-        """Update access url of a service.
-
-        This is typically called from admin APIs only.
-
-        :param unicode project_id: The project id
-        :param unicode service_id: The service id
-        :param dict access_url_changes: The changes to update the access url
-
-        :return: ``True`` if the access urls is successfully updated
-        :rtype: bool
-
-        :raises ValueError: if the domain could not found on the service,
-        :raises ServiceNotFound: if service is not found,
-        :raises InvalidOperation: if the domain is shared ssl,
-        :raises InvalidResourceName: if the access url or domain is invalid
-        """
-        try:
-            service_old = self.storage_controller.get_service(
-                project_id,
-                service_id
-            )
-        except ValueError as e:
-            # If service is not found
-            LOG.warning('Get service {0} failed. '
-                        'Error message: {1}'.format(service_id, e))
-            raise errors.ServiceNotFound(e)
-
-        updated_details = False
-        provider_details = service_old.provider_details
-        domain_name = access_url_changes.get('domain_name')
-        for provider in provider_details:
-            for access_url in provider_details[provider].access_urls:
-                if access_url.get('domain') == domain_name:
-                    if (
-                        'operator_url' in access_url and
-                        'provider_url' in access_url
-                    ):
-                        new_access_url = access_url_changes['operator_url']
-                        new_provider_url = access_url_changes['provider_url']
-                        if access_url.get('shared_ssl_flag', False) is True:
-                            raise errors.InvalidOperation(
-                                'Changing access urls for shared ssl domains '
-                                'is not supported.')
-                        if not new_access_url.startswith(domain_name):
-                            LOG.info('Invalid access_url/domain_name.')
-                            raise errors.InvalidResourceName(
-                                'Invalid access_url/domain_name.')
-                        if new_access_url == access_url['operator_url']:
-                            LOG.info(
-                                "No changes made, both old and new access "
-                                "urls are the same. "
-                                "Domain '{0}'.".format(domain_name))
-                            return False
-                        if new_provider_url != access_url['provider_url']:
-                            raise errors.InvalidOperation(
-                                'Please use the migrate domain functionality '
-                                'to migrate the domain to a new cert.'
-                            )
-                        certificate = (
-                            "shared"
-                            if access_url.get('shared_ssl_flag', False) is True
-                            else None
-                        )
-                        self.dns_controller._create_preferred_cname_record(
-                            domain_name,
-                            certificate,
-                            new_access_url,
-                            new_provider_url
-                        )
-                        self.dns_controller._delete_cname_record(
-                            access_url['operator_url'],
-                            access_url.get('shared_ssl_flag', False)
-                        )
-                        access_url['provider_url'] = new_provider_url
-                        access_url['operator_url'] = new_access_url
-                        updated_details = True
-                        break
-
-        if updated_details is True:
-            self.storage_controller.update_provider_details(
-                project_id,
-                service_id,
-                provider_details
-            )
-        else:
-            err_msg = 'Domain {0} could not be found on service {1}.'.format(
-                domain_name, service_id)
-            LOG.error(err_msg)
-            raise ValueError(err_msg)
-
-        return updated_details

@@ -22,8 +22,6 @@ def load_from_json(json_data):
     cert_type = json_data.get("cert_type")
     project_id = json_data.get("project_id")
     cert_details = json_data.get("cert_details", {})
-    property_activated = json_data.get("property_activated")
 
     return ssl_certificate.SSLCertificate(flavor_id, domain_name,
-                                          cert_type, project_id,
-                                          cert_details, property_activated)
+                                          cert_type, project_id, cert_details)

@@ -16,7 +16,7 @@
 from poppy.model import common
 
 
-VALID_CERT_TYPES = [u'san', u'sni', u'custom', u'dedicated']
+VALID_CERT_TYPES = [u'san', u'custom', u'dedicated']
 VALID_STATUS_IN_CERT_DETAIL = [
     u'deployed',
     u'create_in_progress',
@@ -34,14 +34,12 @@ class SSLCertificate(common.DictSerializableModel):
                  domain_name,
                  cert_type,
                  project_id=None,
-                 cert_details=None,
-                 property_activated=False):
+                 cert_details=None):
         self.flavor_id = flavor_id
         self.domain_name = domain_name
         self.cert_type = cert_type
         self.cert_details = cert_details
         self.project_id = project_id
-        self.property_activated = property_activated
 
     @property
     def flavor_id(self):
@@ -122,8 +120,8 @@ class SSLCertificate(common.DictSerializableModel):
                 )
             return result
 
-    def get_edge_host_name(self):
-        if self.cert_type in ['san', 'sni']:
+    def get_san_edge_name(self):
+        if self.cert_type == 'san':
             if self.cert_details is None or self.cert_details == {}:
                 return None
             first_provider_cert_details = (
@@ -131,10 +129,7 @@ class SSLCertificate(common.DictSerializableModel):
             if first_provider_cert_details is None:
                 return None
             else:
-                if self.cert_type == 'san':
-                    return first_provider_cert_details.get('san cert', None)
-                else:
-                    return first_provider_cert_details.get('sni_cert', None)
+                return first_provider_cert_details.get('san cert', None)
         else:
             return None
 
@@ -143,7 +138,7 @@ class SSLCertificate(common.DictSerializableModel):
         flavor_id = input_dict.get('flavor_id', None)
         domain_name = input_dict.get('domain_name', None)
         cert_type = input_dict.get('cert_type', None)
-        cert_details = dict(input_dict.get('cert_details', {}))
+        cert_details = input_dict.get('cert_details', {})
         project_id = input_dict.get('project_id', None)
 
         ssl_cert = cls(flavor_id=flavor_id,

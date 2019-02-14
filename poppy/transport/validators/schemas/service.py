@@ -112,7 +112,6 @@ class ServiceSchema(schema_base.SchemaBase):
                                         'type': 'string',
                                         'enum': [
                                             'san',
-                                            'sni',
                                             'custom']
                                     },
                                 },

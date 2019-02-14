@@ -206,7 +206,7 @@ class CassandraSanInfoStorage(base.BaseAkamaiSanInfoStorage):
             'ipVersion': ipVersion,
             'slot-deployment.class': slot_deployment_klass,
             'enabled': enabled,
-            'product': 'ion_premier'
+            'product': 'wsd'
         }
 
         if any([i for i in [jobId, issuer, ipVersion, slot_deployment_klass]
@@ -221,12 +221,10 @@ class CassandraSanInfoStorage(base.BaseAkamaiSanInfoStorage):
             raise ValueError('No san cert info found for %s.' % cert_name)
 
         enrollment_id = cert_info.get("enrollmentId")
-        enabled = cert_info.get("enabled", True)
 
         res = {
             'cnameHostname': cert_name,
             'enrollmentId': enrollment_id,
-            'enabled': enabled
         }
 
         if any([i for i in [enrollment_id] if i is None]):
@@ -317,29 +315,15 @@ class CassandraSanInfoStorage(base.BaseAkamaiSanInfoStorage):
         spsId = the_san_cert_info.get('spsId')
         return spsId
 
-    def get_cert_enrollment_id(self, sni_cert_name):
-        sni_cert_info = self._get_akamai_sni_certs_info().get(
-            sni_cert_name
+    def get_enabled_status(self, san_cert_name):
+        the_san_cert_info = self._get_akamai_san_certs_info().get(
+            san_cert_name
         )
 
-        if sni_cert_info is None:
-            raise ValueError(
-                'No enrollment info found for {0}.'.format(sni_cert_name)
-            )
+        if the_san_cert_info is None:
+            raise ValueError('No san cert info found for %s.' % san_cert_name)
 
-        enrollment_id = sni_cert_info.get('enrollmentId')
-        return enrollment_id
-
-    def get_enabled_status(self, cert_name, info_type='san'):
-        if info_type == 'sni':
-            cert_info = self._get_akamai_sni_certs_info().get(cert_name)
-        else:
-            cert_info = self._get_akamai_san_certs_info().get(cert_name)
-
-        if cert_info is None:
-            raise ValueError('No cert info found for %s.' % cert_name)
-
-        enabled = cert_info.get('enabled', True)
+        enabled = the_san_cert_info.get('enabled', True)
         return enabled
 
     def update_san_info(self, info_dict, info_type=None):

@@ -218,8 +218,7 @@ class DeleteStorageServiceTask(task.Task):
             LOG.info('Cassandra session already shutdown')
 
 
-class DeleteCertificatesForService(task.Task):
-    """Delete SAN and SNI certificates for a service."""
+class DeleteCertificatesForServiceSanDomains(task.Task):
 
     def execute(self, project_id, service_id):
         service_controller, self.storage_controller = \
@@ -232,23 +231,16 @@ class DeleteCertificatesForService(task.Task):
 
         kwargs = {
             'project_id': project_id,
-            'context_dict': context_utils.get_current().to_dict(),
-            'flavor_id': service_obj.flavor_id,
-            'providers_list': service_obj.provider_details.keys()
+            'cert_type': 'san',
+            'context_dict': context_utils.get_current().to_dict()
         }
 
         for domain in service_obj.domains:
-            if (
-                domain.protocol == 'https' and
-                domain.certificate in ['san', 'sni']
-            ):
+            if domain.protocol == 'https' and domain.certificate == 'san':
                 kwargs["domain_name"] = domain.domain
-                kwargs["cert_type"] = domain.certificate
                 LOG.info(
-                    "Delete service submit task {0} cert delete "
-                    "domain {1}.".format(
-                        domain.certificate,
-                        domain.domain,
+                    "Delete service submit task san_cert deletion {0}".format(
+                        domain.domain
                     )
                 )
                 service_controller.distributed_task_controller.submit_task(

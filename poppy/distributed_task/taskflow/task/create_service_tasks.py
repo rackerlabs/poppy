@@ -60,25 +60,23 @@ class CreateProviderServicesTask(task.Task):
                 project_id,
                 service_id
             )
-        except ValueError:
-            msg = 'Creating service {0} from Poppy failed. ' \
-                  'No such service exists'.format(service_id)
-            LOG.info(msg)
-            raise Exception(msg)
-
-        for domain in service_obj.domains:
-            if domain.certificate in ['san', 'sni']:
-                try:
-                    domain.cert_info = (
+            for domain in service_obj.domains:
+                if domain.certificate == 'san':
+                    cert_for_domain = (
                         self.ssl_certificate_storage.get_certs_by_domain(
                             domain.domain,
                             project_id=project_id,
                             flavor_id=service_obj.flavor_id,
                             cert_type=domain.certificate
                             ))
-                except ValueError:
-                    domain.cert_info = None
-
+                    if cert_for_domain == []:
+                        cert_for_domain = None
+                    domain.cert_info = cert_for_domain
+        except ValueError:
+            msg = 'Creating service {0} from Poppy failed. ' \
+                  'No such service exists'.format(service_id)
+            LOG.info(msg)
+            raise Exception(msg)
 
         responders = []
         # try to create all service from each provider

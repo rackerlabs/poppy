@@ -13,103 +13,104 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import socket
+import ssl
 import sys
 
 from kazoo import client
-from ndg.httpsclient.subj_alt_name import SubjectAltName
-from OpenSSL import SSL
-from oslo_log import log
-from pyasn1.codec.der import decoder as der_decoder
+from OpenSSL import crypto
+import six
 
-LOG = log.getLogger(__name__)
+# Python 3 does not have ssl.PROTOCOL_SSLv2, but has PROTOCOL_TLSv1_1,
+# PROTOCOL_TLSv1_2, and for some reason Jenkins will not pil up these
+# new versions
+try:
+    if six.PY2:
+        extra_versions = [ssl.PROTOCOL_SSLv2]    # pragma: no cover
+    if six.PY3:                                  # pragma: no cover
+        extra_versions = [ssl.PROTOCOL_TLSv1_1,  # pragma: no cover
+                          ssl.PROTOCOL_TLSv1_2]  # pragma: no cover
+except AttributeError:                           # pragma: no cover
+    extra_versions = []                          # pragma: no cover
 
+ssl_versions = [
+    ssl.PROTOCOL_TLSv1,
+    ssl.PROTOCOL_SSLv23
+]
 
-def pyopenssl_callback(conn, cert, errno, depth, ok):
-    """Callback method for _get_cert_alternate"""
+try:
+    # Warning from python: "documentation SSL version 3 is insecure.
+    # Its use is highly discouraged."
+    ssl_versions.append(ssl.PROTOCOL_SSLv3)
+except AttributeError:
+    pass
 
-    if depth == 0 and (errno == 9 or errno == 10):
-        return False
-    return True
-
-
-def _get_cert_alternate(remote_host):
-    """Create SSL context and get x509 certificate object
-
-    :param remote_host: remote host name that contains the certificate
-    :returns :x509 certificate object
-    """
-
-    try:
-        context = SSL.Context(SSL.TLSv1_METHOD)
-        context.set_options(SSL.OP_NO_SSLv2)
-        context.set_options(SSL.OP_NO_SSLv3)
-        context.set_verify(
-            SSL.VERIFY_PEER | SSL.VERIFY_FAIL_IF_NO_PEER_CERT,
-            pyopenssl_callback
-        )
-        conn = SSL.Connection(context, socket.socket(socket.AF_INET))
-        conn.connect((remote_host, 443))
-        conn.set_connect_state()
-        conn.set_tlsext_host_name(remote_host)
-        conn.do_handshake()
-        cert = conn.get_peer_certificate()
-        conn.close()
-
-        return cert
-    except Exception as exc:
-        LOG.info(
-            "Error retrieving sans for {0}, with exception {1}"
-            .format(remote_host, exc)
-        )
-        raise ValueError(
-            'Get remote host certificate {0} info failed.'.format(remote_host))
+ssl_versions.extend(extra_versions)
 
 
-def get_subject_alternates(cert):
-    """Get the subject alternates from a x509 object
+def get_ssl_number_of_hosts(remote_host):
+    '''Get number of Alternative names for a (SAN) Cert
 
-    :param cert: x509 certificate object
-    :returns: list of subject alternates residing on x509 object
-    """
+    '''
 
-    general_names = SubjectAltName()
-    subject_alternates = []
+    for ssl_version in ssl_versions:
+        try:
+            cert = ssl.get_server_certificate((remote_host, 443),
+                                              ssl_version=ssl_version)
+        except ssl.SSLError:
+            # This exception m
+            continue
 
-    for items in range(cert.get_extension_count()):
-        ext = cert.get_extension(items)
-        if ext.get_short_name() == 'subjectAltName':
-            ext_dat = ext.get_data()
-            decoded_dat = der_decoder.decode(ext_dat, asn1Spec=general_names)
+        x509 = crypto.load_certificate(crypto.FILETYPE_PEM, cert)
 
-            for name in decoded_dat:
-                if isinstance(name, SubjectAltName):
-                    for entry in range(len(name)):
-                        component = name.getComponentByPosition(entry)
-                        subject_alternates.append(
-                            str(component.getComponent())
-                        )
-    return subject_alternates
+        sans = []
+        for idx in range(0, x509.get_extension_count()):
+            extension = x509.get_extension(idx)
+            if extension.get_short_name() == 'subjectAltName':
+                sans = [san.replace('DNS:', '') for san
+                        in str(extension).split(',')]
+                break
 
-
-def get_ssl_number_of_hosts_alternate(remote_host):
-    """Get number of Alternative names for a (SNI) Cert."""
-
-    LOG.info("Checking number of hosts for {0}".format(remote_host))
-
-    cert = _get_cert_alternate(remote_host)
-
-    return len(get_subject_alternates(cert))
+        # We can actually print all the Subject Alternative Names
+        # for san in sans:
+        #     print(san)
+        result = len(sans)
+        break
+    else:
+        raise ValueError('Get remote host certificate info failed...')
+    return result
 
 
-def get_sans_by_host_alternate(remote_host):
-    """Get Subject Alternative Names for a (SNI) Cert."""
+def get_sans_by_host(remote_host):
+    """Get Subject Alternative Names for a (SAN) Cert."""
 
-    LOG.info("Retrieving sans for {0}".format(remote_host))
+    for ssl_version in ssl_versions:
+        try:
+            cert = ssl.get_server_certificate(
+                (remote_host, 443),
+                ssl_version=ssl_version
+            )
+        except ssl.SSLError:
+            # This exception m
+            continue
 
-    cert = _get_cert_alternate(remote_host)
+        x509 = crypto.load_certificate(crypto.FILETYPE_PEM, cert)
 
-    return get_subject_alternates(cert)
+        sans = []
+        for idx in range(0, x509.get_extension_count()):
+            extension = x509.get_extension(idx)
+            if extension.get_short_name() == 'subjectAltName':
+                sans = [
+                    san.replace('DNS:', '').strip() for san in
+                    str(extension).split(',')
+                ]
+                break
+
+        # accumulate all sans across multiple versions
+        result = sans
+        break
+    else:
+        raise ValueError('Get remote host certificate info failed...')
+    return result
 
 
 def connect_to_zookeeper_storage_backend(conf):
@@ -139,4 +140,4 @@ if __name__ == "__main__":
         print('Usage: %s <remote_host_you_want_get_cert_on>' % sys.argv[0])
         sys.exit(0)
     print("There are %s DNS names for SAN Cert on %s" % (
-        get_ssl_number_of_hosts_alternate(sys.argv[1]), sys.argv[1]))
+        get_ssl_number_of_hosts(sys.argv[1]), sys.argv[1]))

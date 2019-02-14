@@ -13,20 +13,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from poppy.model import common
-
 AVAILABLE_PROTOCOLS = [
     u'http',
-    u'https'
-]
+    u'https']
 
 CERTIFICATE_OPTIONS = [
     None,
     u'shared',
     u'san',
-    u'sni',
-    u'custom'
-]
+    u'custom']
+
+from poppy.model import common
 
 
 class Domain(common.DictSerializableModel):
@@ -35,7 +32,7 @@ class Domain(common.DictSerializableModel):
                  certificate=None):
         self._domain = domain.lower().strip()
 
-        if protocol in AVAILABLE_PROTOCOLS:
+        if (protocol in AVAILABLE_PROTOCOLS):
             self._protocol = protocol
         else:
             raise ValueError(
@@ -50,7 +47,7 @@ class Domain(common.DictSerializableModel):
         if self._protocol == 'https':
             if self._certificate not in CERTIFICATE_OPTIONS:
                 raise ValueError(
-                    u'Certificate option: {0} is not valid. '
+                    u'Certificate option: {0} is not valid.'
                     'Valid certificate options are: {1}'.format(
                         certificate,
                         CERTIFICATE_OPTIONS)
@@ -85,7 +82,7 @@ class Domain(common.DictSerializableModel):
                              ' non-https domain')
         if value not in CERTIFICATE_OPTIONS:
             raise ValueError(
-                u'Certificate option: {0} is not valid. '
+                u'Certificate option: {0} is not valid.'
                 'Valid certificate options are: {1}'.format(
                     value,
                     CERTIFICATE_OPTIONS)

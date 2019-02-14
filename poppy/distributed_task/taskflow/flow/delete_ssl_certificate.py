@@ -16,6 +16,7 @@
 from oslo_config import cfg
 from oslo_log import log
 
+from taskflow.patterns import graph_flow
 from taskflow.patterns import linear_flow
 from taskflow import retry
 
@@ -30,7 +31,7 @@ conf(project='poppy', prog='poppy', args=[])
 
 
 def delete_ssl_certificate():
-    flow = linear_flow.Flow('Deleting poppy ssl certificate').add(
+    flow = graph_flow.Flow('Deleting poppy ssl certificate').add(
         linear_flow.Flow('Update Oslo Context').add(
             common.ContextUpdateTask()),
         linear_flow.Flow("Deleting poppy ssl certificate",

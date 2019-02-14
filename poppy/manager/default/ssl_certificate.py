@@ -86,22 +86,10 @@ class DefaultSSLCertificateController(base.SSLCertificateController):
         return kwargs
 
     def delete_ssl_certificate(self, project_id, domain_name, cert_type):
-        cert_obj = self.storage.get_certs_by_domain(
-            domain_name, cert_type=cert_type)
-
-        try:
-            flavor = self.flavor_controller.get(cert_obj.flavor_id)
-        # raise a lookup error if the flavor is not found
-        except LookupError as e:
-            raise e
-
-        providers = [p.provider_id for p in flavor.providers]
         kwargs = {
             'project_id': project_id,
             'domain_name': domain_name,
             'cert_type': cert_type,
-            'cert_obj_json': json.dumps(cert_obj.to_dict()),
-            'providers_list_json': json.dumps(providers),
             'context_dict': context_utils.get_current().to_dict()
         }
         self.distributed_task_controller.submit_task(
@@ -110,11 +98,18 @@ class DefaultSSLCertificateController(base.SSLCertificateController):
         return kwargs
 
     def get_certs_info_by_domain(self, domain_name, project_id):
+        try:
+            certs_info = self.storage.get_certs_by_domain(
+                domain_name=domain_name,
+                project_id=project_id)
+            if not certs_info:
+                raise ValueError("certificate information"
+                                 "not found for {0} ".format(domain_name))
 
-        return self.storage.get_certs_by_domain(
-            domain_name=domain_name,
-            project_id=project_id)
+            return certs_info
 
+        except ValueError as e:
+            raise e
 
     def get_san_retry_list(self):
         if 'akamai' in self._driver.providers:
@@ -129,7 +124,6 @@ class DefaultSSLCertificateController(base.SSLCertificateController):
             {"domain_name": r['domain_name'],
              "project_id":  r['project_id'],
              "flavor_id":   r['flavor_id'],
-             "cert_type":   r['cert_type'],
              "validate_service": r.get('validate_service', True)}
             for r in res
         ]
@@ -145,19 +139,12 @@ class DefaultSSLCertificateController(base.SSLCertificateController):
                                   'to retry this san-retry request forcefully'.
                                   format(r['domain_name'], r))
 
-            cert_for_domain = None
-            try:
-                cert_for_domain = self.storage.get_certs_by_domain(
-                    r['domain_name'])
-            except ValueError:
-                LOG.info("No matching certificates found for "
-                "the domain {}".format(r['domain_name']))
-
-            if cert_for_domain:
+            cert_for_domain = self.storage.get_certs_by_domain(
+                r['domain_name'])
+            if cert_for_domain != []:
                 if cert_for_domain.get_cert_status() == "deployed":
                     raise ValueError(u'Cert on {0} already exists'.
                                      format(r['domain_name']))
-
 
         new_queue_data = [
             json.dumps({'flavor_id':   r['flavor_id'],  # flavor_id
@@ -220,18 +207,15 @@ class DefaultSSLCertificateController(base.SSLCertificateController):
                             service_obj.operator_status
                         )
                     )
-                try:
-                    cert_for_domain = self.storage.get_certs_by_domain(
-                        r['domain_name'])
 
+                cert_for_domain = self.storage.get_certs_by_domain(
+                    r['domain_name'])
+                if cert_for_domain != []:
                     if cert_for_domain.get_cert_status() == "deployed":
                         err_state = True
                         LOG.error(
                             u'Certificate on {0} has already been provisioned '
                             'successfully.'.format(r['domain_name']))
-                except ValueError:
-                    LOG.info("No matching certificates found for "
-                             "the domain {}".format(r['domain_name']))
 
                 if err_state is False:
                     run_list.append(r)
@@ -254,27 +238,23 @@ class DefaultSSLCertificateController(base.SSLCertificateController):
                     cert_obj = ssl_certificate.SSLCertificate(
                         cert_obj_dict['flavor_id'],
                         cert_obj_dict['domain_name'],
-                        cert_obj_dict['cert_type'],
+                        'san',
                         project_id=cert_obj_dict['project_id']
                     )
 
-                    try:
-                        cert_for_domain = (
-                            self.storage.get_certs_by_domain(
-                                cert_obj.domain_name,
-                                project_id=cert_obj.project_id,
-                                flavor_id=cert_obj.flavor_id,
-                                cert_type=cert_obj.cert_type))
-
+                    cert_for_domain = (
+                        self.storage.get_certs_by_domain(
+                            cert_obj.domain_name,
+                            project_id=cert_obj.project_id,
+                            flavor_id=cert_obj.flavor_id,
+                            cert_type=cert_obj.cert_type))
+                    if cert_for_domain == []:
+                        pass
+                    else:
                         # If this cert has been deployed through manual
                         # process we ignore the rerun process for this entry
                         if cert_for_domain.get_cert_status() == 'deployed':
-                            run_list.remove(cert_obj_dict)
-                            ignore_list.append(cert_obj_dict)
                             continue
-                    except ValueError:
-                        LOG.info("No matching certificates found for "
-                                 "the domain {}".format(cert_obj.domain_name))
                     # rerun the san process
                     try:
                         flavor = self.flavor_controller.get(cert_obj.flavor_id)
@@ -286,13 +266,10 @@ class DefaultSSLCertificateController(base.SSLCertificateController):
                     kwargs = {
                         'project_id': cert_obj.project_id,
                         'domain_name': cert_obj.domain_name,
-                        'cert_type': cert_obj.cert_type,
+                        'cert_type': 'san',
                         'providers_list_json': json.dumps(providers),
                         'cert_obj_json': json.dumps(cert_obj.to_dict()),
                         'enqueue': False,
-                        'context_dict': context_utils.RequestContext(
-                            tenant=cert_obj.project_id
-                        ).to_dict()
                     }
                     self.distributed_task_controller.submit_task(
                         recreate_ssl_certificate.recreate_ssl_certificate,
@@ -435,8 +412,14 @@ class DefaultSSLCertificateController(base.SSLCertificateController):
         return certs_by_status
 
     def update_certificate_status(self, domain_name, certificate_updates):
-
         certificate_old = self.storage.get_certs_by_domain(domain_name)
+        if not certificate_old:
+            raise ValueError(
+                "certificate information not found for {0} ".format(
+                    domain_name
+                )
+            )
+
         try:
             if (
                 certificate_updates.get("op") == "replace" and
