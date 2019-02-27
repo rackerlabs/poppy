@@ -11,19 +11,20 @@ pipeline {
         stage('Build') {
             steps {
                 sh '''
-                if [[ ! -d "../venv" ]]; then
-                virtualenv ../venv
-                curl https://bootstrap.pypa.io/get-pip.py | python - 'pip==9.0.3'
-                pip install -U setuptools distutils wheel
+                if [ ! -d ~/poppy_venv ]; then
+                virtualenv ~/poppy_venv
                 fi
-
-                . ../venv/bin/activate
-                pip install -U certifi
+                . ~/poppy_venv/bin/activate
+                if [ $(pip -V | awk '{print $2}') != "9.0.3" ]; then
+                curl -s https://bootstrap.pypa.io/get-pip.py | python - 'pip==9.0.3'
+                fi
+                pip install --find-links=~/wheels -U wheel
+                pip install --find-links=~/wheels setuptools==35.0.2
+                pip install --find-links=~/wheels pbr==0.11.0 certifi==2018.11.29
                 pip install --find-links=~/wheels -r tests/test-requirements.txt
                 pip install --find-links=~/wheels -r requirements/requirements.txt
-                pip install pbr==0.11.0
-                pip install certifi==2015.4.28
                 python setup.py install
+
                 '''
             }
         }
@@ -33,7 +34,7 @@ pipeline {
                     steps {
                         echo 'uncomment the following to enable pylint:'
                         sh '''
-                        #. venv/bin/activate
+                        #. ~/poppy_venv/bin/activate
                         # pycodestyle --max-line-length=119 --statistics --first
                         '''
                     }
@@ -41,7 +42,7 @@ pipeline {
                 stage('Unit-Tests') {
                     steps {
                         sh '''
-                        . ../venv/bin/activate
+                        . ~/poppy_venv/bin/activate
                         nosetests --with-coverage --cover-package=poppy --with-xunit --xunit-file=unit-tests.xml tests/unit
                         '''
                     }
@@ -54,7 +55,7 @@ pipeline {
                 stage('Functional-Tests') {
                     steps {
                         sh '''
-                        . ../venv/bin/activate
+                        . ~/poppy_venv/bin/activate
                         nosetests --with-coverage --cover-package=poppy --with-xunit --xunit-file=functional-tests.xml tests/functional
                         '''
                     }
@@ -70,16 +71,36 @@ pipeline {
         stage('Build-Python-Packages') {
             steps {
                 sh '''
-                . ../venv/bin/activate
+                . ~/poppy_venv/bin/activate
                 rm -rf dist
-                pip install -U setuptools distutils wheel
                 PBR_VERSION=2017.11.${BUILD_NUMBER} python setup.py bdist_wheel upload -v -r prev
                 '''
             }
         }
         stage('Deploy-To-Preview') {
-            steps {
-                sh 'ssh jenkins@salt-test.altcdn.com  "bash preview-deploy.sh"'
+            parallel {
+                stage('Deploy-To-Poppy-Workers') {
+                    when {
+                    branch 'dev'
+                     }
+                    steps {
+                        sh '''
+                        echo "deploy to pwkrs here"
+                        # ssh jenkins@salt-test.altcdn.com  "bash preview-deploy-pwkr.sh"
+                        '''
+                    }
+                }
+                stage('Deploy-To-Poppy-Servers') {
+                    when {
+                    branch 'dev'
+                     }
+                    steps {
+                        sh '''
+                        echo "deploy to cdn servers here"
+                        # ssh jenkins@salt-test.altcdn.com  "bash preview-deploy-cdn.sh"
+                        '''
+                    }
+                }
             }
         }
     }
