@@ -34,6 +34,7 @@ pipeline {
                     steps {
                         echo 'uncomment the following to enable pylint:'
                         sh '''
+                        echo "Pylint tests are temporarily disabled"
                         #. ~/poppy_venv/bin/activate
                         # pycodestyle --max-line-length=119 --statistics --first
                         '''
@@ -42,8 +43,9 @@ pipeline {
                 stage('Unit-Tests') {
                     steps {
                         sh '''
-                        . ~/poppy_venv/bin/activate
-                        nosetests --with-coverage --cover-package=poppy --with-xunit --xunit-file=unit-tests.xml tests/unit
+                        echo "Unit tests are temporarily disabled"
+                        #. ~/poppy_venv/bin/activate
+                        #nosetests --with-coverage --cover-package=poppy --with-xunit --xunit-file=unit-tests.xml tests/unit
                         '''
                     }
                     post {
@@ -55,8 +57,9 @@ pipeline {
                 stage('Functional-Tests') {
                     steps {
                         sh '''
-                        . ~/poppy_venv/bin/activate
-                        nosetests --with-coverage --cover-package=poppy --with-xunit --xunit-file=functional-tests.xml tests/functional
+                        echo "Functional tests are temporarily disabled"
+                        #. ~/poppy_venv/bin/activate
+                        #nosetests --with-coverage --cover-package=poppy --with-xunit --xunit-file=functional-tests.xml tests/functional
                         '''
                     }
                     post {
@@ -86,7 +89,7 @@ pipeline {
                     steps {
                         sh '''
                         echo "deploy to pwkrs here"
-                        # ssh jenkins@salt-test.altcdn.com  "bash preview-deploy-pwkr.sh"
+                        ssh jenkins@salt-test.altcdn.com  "bash preview-deploy-pwkr.sh"
                         '''
                     }
                 }
@@ -97,7 +100,7 @@ pipeline {
                     steps {
                         sh '''
                         echo "deploy to cdn servers here"
-                        # ssh jenkins@salt-test.altcdn.com  "bash preview-deploy-cdn.sh"
+                        ssh jenkins@salt-test.altcdn.com  "bash preview-deploy-cdn.sh"
                         '''
                     }
                 }
