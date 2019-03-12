@@ -50,7 +50,7 @@ pipeline {
                     }
                     post {
                         always {
-                            junit 'unit-tests.xml'
+                            #junit 'unit-tests.xml'
                         }
                     }
                 }
@@ -64,7 +64,7 @@ pipeline {
                     }
                     post {
                         always {
-                            junit 'functional-tests.xml'
+                            #junit 'functional-tests.xml'
                         }
                     }
 
