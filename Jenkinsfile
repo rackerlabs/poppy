@@ -11,7 +11,7 @@ pipeline {
                 echo "Setup poppy_venv and install deps"
                 sh 'if [ -d poppy_venv/ ]; then rm -rf poppy_venv; fi'
                 sh 'if [ -d ~/base_poppy_venv ]; then virtualenv-clone ~/base_poppy_venv poppy_venv; else virtualenv poppy_venv; fi'
-                sh '. poppy_venv/bin/activate && if [ $(pip -V | awk "{print $2}") != "9.0.3" ]; then curl -s https://bootstrap.pypa.io/get-pip.py | python - "pip==9.0.3"; fi'
+                sh '''. poppy_venv/bin/activate && if [ $(pip -V | awk '{print $2}') != "9.0.3" ]; then curl -s https://bootstrap.pypa.io/get-pip.py | python - "pip==9.0.3"; fi'''
                 sh '. poppy_venv/bin/activate && pip install --find-links=~/wheels -U wheel'
                 sh '. poppy_venv/bin/activate && pip install --find-links=~/wheels setuptools==35.0.2'
                 sh '. poppy_venv/bin/activate && pip install --find-links=~/wheels pbr==0.11.0 certifi==2018.11.29 testrepository'
