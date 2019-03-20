@@ -140,13 +140,13 @@ pipeline {
                 echo "start deploy poppy workers"
                 sh '''
                     if [ $DEPLOY_HKG = "TRUE" ]; then
-                        ssh jenkins@104.130.7.18 'sudo salt -v pwkr?a-ccp-hkg state.sls poppy_worker cdn-prod-hkg test=True'
+                        ssh jenkins@104.130.7.18 'sudo salt -v pwkr?a-ccp-hkg state.sls poppy_worker cdn-prod-hkg'
                     fi
                 '''
                 echo "start deploy poppy servers"
                 sh '''
                     if [ $DEPLOY_HKG = "TRUE" ]; then
-                        ssh jenkins@104.130.7.18 'sudo salt -v cdn?a-ccp-hkg state.sls poppy_server cdn-prod-hkg test=True'
+                        ssh jenkins@104.130.7.18 'sudo salt -v cdn?a-ccp-hkg state.sls poppy_server cdn-prod-hkg'
                     fi
                 '''
             }
@@ -174,13 +174,13 @@ pipeline {
                 echo "start deploy poppy workers"
                 sh '''
                     if [ $DEPLOY_LON = "TRUE" ]; then
-                        ssh jenkins@104.130.7.18 'sudo salt -v pwkr?a-ccp-lon state.sls poppy_worker cdn-prod-lon test=True'
+                        ssh jenkins@104.130.7.18 'sudo salt -v pwkr?a-ccp-lon state.sls poppy_worker cdn-prod-lon'
                     fi
                 '''
                 echo "start deploy poppy servers"
                 sh '''
                     if [ $DEPLOY_LON = "TRUE" ]; then
-                        ssh jenkins@104.130.7.18 'sudo salt -v cdn?a-ccp-lon state.sls poppy_server cdn-prod-lon test=True'
+                        ssh jenkins@104.130.7.18 'sudo salt -v cdn?a-ccp-lon state.sls poppy_server cdn-prod-lon'
                     fi
                 '''
             }
@@ -208,13 +208,13 @@ pipeline {
                 echo "start deploy poppy workers"
                 sh '''
                     if [ $DEPLOY_IAD = "TRUE" ]; then
-                        ssh jenkins@104.130.7.18 'sudo salt -v pwkr?a-ccp-iad state.sls poppy_worker cdn-prod-iad test=True'
+                        ssh jenkins@104.130.7.18 'sudo salt -v pwkr?a-ccp-iad state.sls poppy_worker cdn-prod-iad'
                     fi
                 '''
                 echo "start deploy poppy servers"
                 sh '''
                     if [ $DEPLOY_IAD = "TRUE" ]; then
-                        ssh jenkins@104.130.7.18 'sudo salt -v cdn?a-ccp-iad state.sls poppy_server cdn-prod-iad test=True'
+                        ssh jenkins@104.130.7.18 'sudo salt -v cdn?a-ccp-iad state.sls poppy_server cdn-prod-iad'
                     fi
                 '''
             }
