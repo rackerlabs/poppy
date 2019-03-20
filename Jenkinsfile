@@ -71,31 +71,27 @@ pipeline {
                 }
             }
         }
-        stage('Build-and-Upload') {
-            parallel {
-                stage('PyPI Preview') {
-                    when { anyOf { branch 'pre-release'; branch 'release' } }
-                    steps {
-                        sh '''
-                        echo "Build and Upload PREVIEW Wheel for $BRANCH_NAME"
-                        . poppy_venv/bin/activate
-                        rm -rf dist
-                        PBR_VERSION=2019.2.${BUILD_NUMBER} python setup.py bdist_wheel upload -v -r prev
-                        '''
-                    }
-                }
-                stage('PyPI Production') {
-                    when { branch 'release' }
-                    steps {
-                        echo "want to use when tag regex here but it seems broken, using when branch for now"
-                        sh '''
-                        echo "Build and Upload PROD Wheel for $TAG_NAME - this is temporarily disabled"
-                        . poppy_venv/bin/activate
-                        rm -rf dist
-                        PBR_VERSION=2019.2.${BUILD_NUMBER} python setup.py bdist_wheel upload -v -r prod
-                        '''
-                    }
-                }
+        stage('PyPI Preview') {
+            when { anyOf { branch 'pre-release'; branch 'release' } }
+            steps {
+                sh '''
+                echo "Build and Upload PREVIEW Wheel for $BRANCH_NAME"
+                . poppy_venv/bin/activate
+                rm -rf dist
+                PBR_VERSION=2019.2.${BUILD_NUMBER} python setup.py bdist_wheel upload -v -r prev
+                '''
+            }
+        }
+        stage('PyPI Production') {
+            when { branch 'release' }
+            steps {
+                echo "want to use when tag regex here but it seems broken, using when branch for now"
+                sh '''
+                echo "Build and Upload PROD Wheel for $TAG_NAME - this is temporarily disabled"
+                . poppy_venv/bin/activate
+                rm -rf dist
+                PBR_VERSION=2019.2.${BUILD_NUMBER} python setup.py bdist_wheel upload -v -r prod
+                '''
             }
         }
         stage('Deploy Prev IAD') {
