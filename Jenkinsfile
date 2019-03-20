@@ -78,7 +78,7 @@ pipeline {
                 echo "Build and Upload PREVIEW Wheel for $BRANCH_NAME"
                 . poppy_venv/bin/activate
                 rm -rf dist
-                PBR_VERSION=2019.2.${BUILD_NUMBER} python setup.py bdist_wheel upload -v -r prev
+                PBR_VERSION=2019.3.${BUILD_NUMBER} python setup.py bdist_wheel upload -v -r prev
                 '''
             }
         }
@@ -90,7 +90,7 @@ pipeline {
                 echo "Build and Upload PROD Wheel for $TAG_NAME - this is temporarily disabled"
                 . poppy_venv/bin/activate
                 rm -rf dist
-                PBR_VERSION=2019.2.${BUILD_NUMBER} python setup.py bdist_wheel upload -v -r prod
+                PBR_VERSION=2019.3.${BUILD_NUMBER} python setup.py bdist_wheel upload -v -r prod
                 '''
             }
         }
